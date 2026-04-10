@@ -243,7 +243,7 @@ export function AIVoiceAssistant() {
       setStatus('listening');
 
       const session = await aiRef.current.live.connect({
-        model: "gemini-3.1-flash-live-preview",
+        model: "gemini-2.0-flash",
         callbacks: {
           onopen: () => {
             console.log("Live API connection established.");
