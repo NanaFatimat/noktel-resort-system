@@ -1,0 +1,7 @@
+{
+  "name": "Noktel Resort Booking & AI Voice System",
+  "description": "A web-based hotel booking application with AI-powered automated call handling for Noktel Resort Hotel, Ilorin.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

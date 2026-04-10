@@ -1,0 +1,162 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: rooms
+    // Document ID: [auto-generated]
+    // Fields:
+    //   - name: string (required) - Name or number of the room
+    //   - type: string (required) - Room category ('standard', 'deluxe', 'executive')
+    //   - price: number (required) - Price per night in NGN
+    //   - capacity: number (required) - Maximum number of guests
+    //   - status: string (required) - Current status ('available', 'maintenance')
+    //
+    // Collection: bookings
+    // Document ID: [auto-generated]
+    // Fields:
+    //   - customerId: string (required) - Firebase Auth UID of the customer
+    //   - customerName: string (required) - Full name of the guest
+    //   - customerEmail: string (required) - Email address of the guest
+    //   - customerPhone: string (required) - Phone number of the guest
+    //   - roomId: string (required) - ID of the booked room
+    //   - roomName: string (required) - Name of the booked room
+    //   - checkIn: string (required) - Check-in date (ISO string)
+    //   - checkOut: string (required) - Check-out date (ISO string)
+    //   - guests: number (required) - Number of guests
+    //   - totalAmount: number (required) - Total price for the stay
+    //   - status: string (required) - Status ('pending', 'confirmed', 'cancelled')
+    //   - source: string (required) - Where the booking originated ('web', 'phone')
+    //   - createdAt: string (required) - When the booking was created
+    //
+    // Collection: users
+    // Document ID: {userId} (matches Auth UID)
+    // Fields:
+    //   - role: string (required) - Role ('customer', 'staff', 'admin')
+    //   - name: string (required) - Full name
+    //   - email: string (required) - Email address
+    //   - createdAt: string (required) - Account creation date
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "feraclem@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isStaffOrAdmin() {
+      return isAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff');
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function hasOnlyAllowedFields(allowedFields) {
+      return request.resource.data.keys().hasOnly(allowedFields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidRoom(data) {
+      return hasOnlyAllowedFields(['name', 'type', 'price', 'capacity', 'status']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
+             data.type in ['standard', 'deluxe', 'executive'] &&
+             data.price is number && data.price >= 0 &&
+             data.capacity is number && data.capacity > 0 && data.capacity <= 10 &&
+             data.status in ['available', 'maintenance'];
+    }
+
+    function isValidBooking(data) {
+      return hasOnlyAllowedFields(['customerId', 'customerName', 'customerEmail', 'customerPhone', 'roomId', 'roomName', 'checkIn', 'checkOut', 'guests', 'totalAmount', 'status', 'source', 'createdAt']) &&
+             data.customerId is string && data.customerId.size() > 0 && data.customerId.size() < 100 &&
+             data.customerName is string && data.customerName.size() > 0 && data.customerName.size() < 100 &&
+             isValidEmail(data.customerEmail) &&
+             data.customerPhone is string && data.customerPhone.size() >= 5 && data.customerPhone.size() < 20 &&
+             data.roomId is string && data.roomId.size() > 0 && data.roomId.size() < 50 &&
+             data.roomName is string && data.roomName.size() > 0 && data.roomName.size() < 50 &&
+             isValidDateString(data.checkIn) &&
+             isValidDateString(data.checkOut) &&
+             data.guests is number && data.guests > 0 && data.guests <= 10 &&
+             data.totalAmount is number && data.totalAmount >= 0 &&
+             data.status in ['pending', 'confirmed', 'cancelled'] &&
+             data.source in ['web', 'phone'] &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['role', 'name', 'email', 'createdAt']) &&
+             data.role in ['customer', 'staff', 'admin'] &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             isValidEmail(data.email) &&
+             isValidDateString(data.createdAt);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /rooms/{roomId} {
+      // Anyone can read rooms (to see availability)
+      allow read: if true;
+      // Only staff/admin can create/update/delete rooms
+      allow create: if isStaffOrAdmin() && isValidRoom(request.resource.data);
+      allow update: if isStaffOrAdmin() && isValidRoom(request.resource.data);
+      allow delete: if isStaffOrAdmin();
+    }
+
+    match /bookings/{bookingId} {
+      // Users can read their own bookings. Staff can read all.
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.customerId || isStaffOrAdmin());
+      
+      // Users can create bookings for themselves. Staff can create for anyone.
+      allow create: if isAuthenticated() && isValidBooking(request.resource.data) && 
+                    (request.resource.data.customerId == request.auth.uid || isStaffOrAdmin());
+      
+      // Users can update their own bookings (e.g., cancel). Staff can update any.
+      // We must ensure customerId doesn't change on update.
+      allow update: if isAuthenticated() && isValidBooking(request.resource.data) &&
+                    request.resource.data.customerId == resource.data.customerId &&
+                    (request.auth.uid == resource.data.customerId || isStaffOrAdmin());
+                    
+      allow delete: if isStaffOrAdmin();
+    }
+
+    match /users/{userId} {
+      // Users can read their own profile. Staff can read all.
+      allow read: if isOwner(userId) || isStaffOrAdmin();
+      
+      // Users can create their own profile (defaulting to 'customer'). Admins can create any.
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    ((isOwner(userId) && request.resource.data.role == 'customer') || isAdmin());
+                    
+      // Users can update their own profile (cannot change role). Admins can update any.
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) &&
+                    ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
+                    
+      allow delete: if isAdmin();
+    }
+  }
+}

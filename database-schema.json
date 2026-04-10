@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "Room": {
+      "title": "Room",
+      "description": "A hotel room available for booking.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name or number of the room" },
+        "type": { "type": "string", "enum": ["standard", "deluxe", "executive"], "description": "Room category" },
+        "price": { "type": "number", "description": "Price per night in NGN" },
+        "capacity": { "type": "number", "description": "Maximum number of guests" },
+        "status": { "type": "string", "enum": ["available", "maintenance"], "description": "Current status of the room" }
+      },
+      "required": ["name", "type", "price", "capacity", "status"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "A reservation made by a customer.",
+      "type": "object",
+      "properties": {
+        "customerId": { "type": "string", "description": "Firebase Auth UID of the customer (anonymous or registered)" },
+        "customerName": { "type": "string", "description": "Full name of the guest" },
+        "customerEmail": { "type": "string", "format": "email", "description": "Email address of the guest" },
+        "customerPhone": { "type": "string", "description": "Phone number of the guest" },
+        "roomId": { "type": "string", "description": "ID of the booked room" },
+        "roomName": { "type": "string", "description": "Name of the booked room" },
+        "checkIn": { "type": "string", "format": "date-time", "description": "Check-in date (ISO string)" },
+        "checkOut": { "type": "string", "format": "date-time", "description": "Check-out date (ISO string)" },
+        "guests": { "type": "number", "description": "Number of guests" },
+        "totalAmount": { "type": "number", "description": "Total price for the stay" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled"], "description": "Status of the booking" },
+        "source": { "type": "string", "enum": ["web", "phone"], "description": "Where the booking originated" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the booking was created" }
+      },
+      "required": ["customerId", "customerName", "customerEmail", "customerPhone", "roomId", "roomName", "checkIn", "checkOut", "guests", "totalAmount", "status", "source", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A registered user (staff or customer).",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["customer", "staff", "admin"], "description": "Role of the user" },
+        "name": { "type": "string", "description": "Full name" },
+        "email": { "type": "string", "format": "email", "description": "Email address" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation date" }
+      },
+      "required": ["role", "name", "email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/rooms/{roomId}": {
+      "schema": { "$ref": "#/entities/Room" },
+      "description": "Collection of all hotel rooms."
+    },
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "Collection of all reservations."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Collection of user profiles."
+    }
+  }
+}
