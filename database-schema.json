@@ -29,10 +29,12 @@
         "guests": { "type": "number", "description": "Number of guests" },
         "totalAmount": { "type": "number", "description": "Total price for the stay" },
         "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled"], "description": "Status of the booking" },
+        "paymentMethod": { "type": "string", "enum": ["stripe", "pay_at_hotel"], "description": "How the user chose to pay" },
+        "paymentStatus": { "type": "string", "enum": ["paid", "unpaid", "refunded"], "description": "Current payment status" },
         "source": { "type": "string", "enum": ["web", "phone"], "description": "Where the booking originated" },
         "createdAt": { "type": "string", "format": "date-time", "description": "When the booking was created" }
       },
-      "required": ["customerId", "customerName", "customerEmail", "customerPhone", "roomId", "roomName", "checkIn", "checkOut", "guests", "totalAmount", "status", "source", "createdAt"]
+      "required": ["customerId", "customerName", "customerEmail", "customerPhone", "roomId", "roomName", "checkIn", "checkOut", "guests", "totalAmount", "status", "paymentMethod", "paymentStatus", "source", "createdAt"]
     },
     "User": {
       "title": "User",

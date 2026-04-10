@@ -29,6 +29,8 @@ service cloud.firestore {
     //   - guests: number (required) - Number of guests
     //   - totalAmount: number (required) - Total price for the stay
     //   - status: string (required) - Status ('pending', 'confirmed', 'cancelled')
+    //   - paymentMethod: string (required) - Payment method ('stripe', 'pay_at_hotel')
+    //   - paymentStatus: string (required) - Payment status ('paid', 'unpaid', 'refunded')
     //   - source: string (required) - Where the booking originated ('web', 'phone')
     //   - createdAt: string (required) - When the booking was created
     //
@@ -90,7 +92,7 @@ service cloud.firestore {
     }
 
     function isValidBooking(data) {
-      return hasOnlyAllowedFields(['customerId', 'customerName', 'customerEmail', 'customerPhone', 'roomId', 'roomName', 'checkIn', 'checkOut', 'guests', 'totalAmount', 'status', 'source', 'createdAt']) &&
+      return hasOnlyAllowedFields(['customerId', 'customerName', 'customerEmail', 'customerPhone', 'roomId', 'roomName', 'checkIn', 'checkOut', 'guests', 'totalAmount', 'status', 'paymentMethod', 'paymentStatus', 'source', 'createdAt']) &&
              data.customerId is string && data.customerId.size() > 0 && data.customerId.size() < 100 &&
              data.customerName is string && data.customerName.size() > 0 && data.customerName.size() < 100 &&
              isValidEmail(data.customerEmail) &&
@@ -102,6 +104,8 @@ service cloud.firestore {
              data.guests is number && data.guests > 0 && data.guests <= 10 &&
              data.totalAmount is number && data.totalAmount >= 0 &&
              data.status in ['pending', 'confirmed', 'cancelled'] &&
+             data.paymentMethod in ['stripe', 'pay_at_hotel'] &&
+             data.paymentStatus in ['paid', 'unpaid', 'refunded'] &&
              data.source in ['web', 'phone'] &&
              isValidDateString(data.createdAt);
     }

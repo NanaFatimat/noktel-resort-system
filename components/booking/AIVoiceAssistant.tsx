@@ -322,6 +322,8 @@ export function AIVoiceAssistant() {
                         guests: args.guests,
                         totalAmount: args.totalAmount,
                         status: 'pending',
+                        paymentMethod: 'pay_at_hotel',
+                        paymentStatus: 'unpaid',
                         source: 'phone',
                         createdAt: new Date().toISOString()
                       };

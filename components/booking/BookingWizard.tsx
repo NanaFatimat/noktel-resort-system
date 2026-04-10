@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, ChevronRight, ChevronLeft, CheckCircle2, X } from 'lucide-react';
+import { Calendar, Users, ChevronRight, ChevronLeft, CheckCircle2, X, CreditCard, Hotel } from 'lucide-react';
 import { useRooms, Room } from '@/hooks/use-rooms';
 import { addDoc, collection } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
@@ -78,6 +78,7 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
     email: '',
     phone: ''
   });
+  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'pay_at_hotel'>('pay_at_hotel');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -113,16 +114,51 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
         guests: guests,
         totalAmount: calculateTotal(),
         status: 'pending',
+        paymentMethod: paymentMethod,
+        paymentStatus: 'unpaid',
         source: 'web',
         createdAt: new Date().toISOString()
       };
 
+      let bookingId = '';
       try {
-        await addDoc(collection(db, 'bookings'), bookingData);
+        const docRef = await addDoc(collection(db, 'bookings'), bookingData);
+        bookingId = docRef.id;
       } catch (error) {
         handleFirestoreError(error, OperationType.CREATE, 'bookings');
+        throw error;
       }
-      setStep(4); // Success step
+
+      if (paymentMethod === 'stripe') {
+        // Call our API route to create a Stripe Checkout Session
+        const response = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            bookingData: { ...bookingData, roomId: selectedRoom!.id },
+            successUrl: `${window.location.origin}/booking/success?booking_id=${bookingId}`,
+            cancelUrl: `${window.location.origin}/booking/cancel`,
+          }),
+        });
+
+        const session = await response.json();
+
+        if (session.error) {
+          throw new Error(session.error);
+        }
+
+        // Redirect to Stripe Checkout URL directly
+        if (session.url) {
+          window.location.href = session.url;
+        } else {
+          throw new Error('Failed to get checkout URL from Stripe');
+        }
+      } else {
+        // Pay at hotel, just show success
+        setStep(5); // Success step
+      }
     } catch (err: any) {
       console.error(err);
       setError('Failed to complete booking. Please try again.');
@@ -143,7 +179,7 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
         <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50">
           <div>
             <h2 className="text-2xl font-serif font-bold text-slate-900">Book Your Stay</h2>
-            <p className="text-sm text-slate-500">Step {step} of 3</p>
+            <p className="text-sm text-slate-500">Step {step} of 4</p>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-full hover:bg-slate-200">
             <X className="w-6 h-6" />
@@ -304,6 +340,52 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
             {step === 4 && (
               <motion.div
                 key="step4"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                <h3 className="text-lg font-semibold text-slate-900">Payment Method</h3>
+                <p className="text-slate-600 mb-4">Choose how you would like to pay for your stay.</p>
+                
+                <div className="space-y-4">
+                  <div 
+                    onClick={() => setPaymentMethod('stripe')}
+                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 ${
+                      paymentMethod === 'stripe' ? 'border-amber-500 bg-amber-50' : 'border-slate-100 hover:border-amber-200'
+                    }`}
+                  >
+                    <div className={`p-3 rounded-full ${paymentMethod === 'stripe' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                      <CreditCard className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-lg">Pay Now (Card)</h4>
+                      <p className="text-sm text-slate-500">Pay securely now via Stripe. Faster check-in.</p>
+                    </div>
+                  </div>
+
+                  <div 
+                    onClick={() => setPaymentMethod('pay_at_hotel')}
+                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 ${
+                      paymentMethod === 'pay_at_hotel' ? 'border-amber-500 bg-amber-50' : 'border-slate-100 hover:border-amber-200'
+                    }`}
+                  >
+                    <div className={`p-3 rounded-full ${paymentMethod === 'pay_at_hotel' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                      <Hotel className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-lg">Pay at Hotel</h4>
+                      <p className="text-sm text-slate-500">Reserve now, pay when you arrive at the reception.</p>
+                    </div>
+                  </div>
+                </div>
+                {error && <p className="text-red-500 text-sm">{error}</p>}
+              </motion.div>
+            )}
+
+            {step === 5 && (
+              <motion.div
+                key="step5"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="py-12 flex flex-col items-center text-center space-y-4"
@@ -322,7 +404,7 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
         </div>
 
         {/* Footer Actions */}
-        {step < 4 && (
+        {step < 5 && (
           <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
             {step > 1 ? (
               <Button variant="ghost" onClick={() => setStep(step - 1)}>
@@ -350,10 +432,19 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
 
             {step === 3 && (
               <Button 
-                onClick={handleBook} 
-                disabled={!guestDetails.name || !guestDetails.email || !guestDetails.phone || isSubmitting}
+                onClick={() => setStep(4)} 
+                disabled={!guestDetails.name || !guestDetails.email || !guestDetails.phone}
               >
-                {isSubmitting ? 'Processing...' : 'Confirm Booking'}
+                Continue to Payment <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            )}
+
+            {step === 4 && (
+              <Button 
+                onClick={handleBook} 
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Processing...' : (paymentMethod === 'stripe' ? 'Proceed to Payment' : 'Confirm Booking')}
               </Button>
             )}
           </div>
