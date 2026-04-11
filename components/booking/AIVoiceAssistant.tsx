@@ -101,6 +101,7 @@ export function AIVoiceAssistant() {
   const isCallActiveRef = useRef(false);
   const [status, setStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
   const [messages, setMessages] = useState<{role: string, text: string}[]>([]);
+  const [error, setError] = useState<string | null>(null);
   
   const aiRef = useRef<GoogleGenAI | null>(null);
   const sessionRef = useRef<any>(null);
@@ -179,8 +180,7 @@ export function AIVoiceAssistant() {
     // Initialize GoogleGenAI right before the call to ensure we have the latest API key
     if (process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
       aiRef.current = new GoogleGenAI({ 
-        apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY,
-        apiVersion: 'v1alpha'
+        apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY
       });
     }
 
@@ -188,6 +188,8 @@ export function AIVoiceAssistant() {
       console.error("Gemini API Key not found in environment.");
       return;
     }
+    
+    setError(null);
     
     try {
       // Initialize Audio Context - 16000Hz is required for Gemini Live Input
@@ -217,7 +219,17 @@ export function AIVoiceAssistant() {
       const url = URL.createObjectURL(blob);
       await audioContextRef.current.audioWorklet.addModule(url);
       
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        if (err instanceof Error && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+          setError("Microphone access denied. Please enable microphone permissions in your browser settings and try again.");
+        } else {
+          setError("Could not access microphone. Please ensure a microphone is connected and try again.");
+        }
+        return;
+      }
       const source = audioContextRef.current.createMediaStreamSource(stream);
       audioWorkletNodeRef.current = new AudioWorkletNode(audioContextRef.current, 'recorder-processor');
       
@@ -246,7 +258,7 @@ export function AIVoiceAssistant() {
       setStatus('listening');
 
       const session = await aiRef.current.live.connect({
-        model: "gemini-2.0-flash-exp",
+        model: "gemini-3.1-flash-live-preview",
         callbacks: {
           onopen: () => {
             console.log("Live API connection established.");
@@ -344,14 +356,21 @@ export function AIVoiceAssistant() {
               }
             }
           },
-          onerror: (error) => {
-            console.error("Live API Connection Error:", error);
-            if (error instanceof Event) {
-              console.error("WebSocket handshake failed. This usually means the model name is incorrect, the API key lacks permissions for the Live API, or your region is not supported.");
+          onerror: (err) => {
+            console.error("Live API Connection Error:", err);
+            if (err instanceof Event) {
+              setError("Connection failed. Please check your internet connection or try again later.");
+            } else if (err instanceof Error) {
+              if (err.message.includes("permission")) {
+                setError("Permission denied. Please ensure your API key has 'Multimodal Live API' enabled.");
+              } else {
+                setError(`Connection error: ${err.message}`);
+              }
+            } else {
+              setError("An unexpected error occurred during the call.");
             }
-            if (error instanceof Error && error.message.includes("permission")) {
-              console.error("PERMISSION ERROR: Please ensure your Gemini API Key has 'Multimodal Live API' enabled in the Google AI Studio settings.");
-            }
+            setIsCallActive(false);
+            isCallActiveRef.current = false;
           },
           onclose: (event) => {
             console.log("Live API connection closed. Code:", event.code, "Reason:", event.reason);
@@ -376,10 +395,13 @@ export function AIVoiceAssistant() {
 
       sessionRef.current = session;
 
-    } catch (error) {
-      console.error("Failed to start call:", error);
+    } catch (err) {
+      console.error("Failed to start call:", err);
       setIsCallActive(false);
       isCallActiveRef.current = false;
+      if (!error) {
+        setError(err instanceof Error ? err.message : "An unexpected error occurred while starting the call.");
+      }
     }
   };
 
@@ -447,10 +469,14 @@ export function AIVoiceAssistant() {
               className="bg-[#1C1C1E] sm:rounded-[40px] shadow-2xl w-full h-full sm:h-[800px] sm:max-w-[375px] overflow-hidden flex flex-col relative text-white"
             >
               {/* Top Section */}
-              <div className="pt-16 pb-8 flex flex-col items-center">
+              <div className="pt-16 pb-8 flex flex-col items-center px-6 text-center">
                 <h2 className="text-3xl font-normal tracking-wide mb-2">AI Receptionist</h2>
                 <p className="text-[#8E8E93] text-sm">
-                  {!isCallActive ? 'Noktel Resort' : (status === 'listening' ? 'listening...' : status === 'speaking' ? 'speaking...' : 'connecting...')}
+                  {error ? (
+                    <span className="text-red-400">{error}</span>
+                  ) : (
+                    !isCallActive ? 'Noktel Resort' : (status === 'listening' ? 'listening...' : status === 'speaking' ? 'speaking...' : 'connecting...')
+                  )}
                 </p>
               </div>
 
