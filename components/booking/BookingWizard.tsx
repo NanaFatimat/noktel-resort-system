@@ -143,6 +143,11 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
           }),
         });
 
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to connect to payment server' }));
+          throw new Error(errorData.error || 'Payment initialization failed');
+        }
+
         const session = await response.json();
 
         if (session.error) {
