@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, Phone, PhoneOff, Loader2, Volume2 } from 'lucide-react';
+import { Mic, MicOff, Phone, PhoneOff, Loader2, Volume2, Grid, Plus, Video, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GoogleGenAI, Type, FunctionDeclaration, Modality, LiveServerMessage } from '@google/genai';
 import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
@@ -178,7 +178,10 @@ export function AIVoiceAssistant() {
   const startCall = async () => {
     // Initialize GoogleGenAI right before the call to ensure we have the latest API key
     if (process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
-      aiRef.current = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
+      aiRef.current = new GoogleGenAI({ 
+        apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY,
+        apiVersion: 'v1alpha'
+      });
     }
 
     if (!aiRef.current) {
@@ -243,7 +246,7 @@ export function AIVoiceAssistant() {
       setStatus('listening');
 
       const session = await aiRef.current.live.connect({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.0-flash-exp",
         callbacks: {
           onopen: () => {
             console.log("Live API connection established.");
@@ -426,135 +429,119 @@ export function AIVoiceAssistant() {
       <motion.button
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
-        className="fixed bottom-6 right-6 w-16 h-16 bg-amber-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-amber-700 transition-colors z-40"
+        className="fixed bottom-6 right-6 w-16 h-16 bg-[#34C759] text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-[#32D74B] transition-colors z-40"
         onClick={() => setIsOpen(true)}
       >
-        <Phone className="w-6 h-6" />
+        <Phone className="w-8 h-8" />
       </motion.button>
 
       {/* Call Interface Modal */}
       <AnimatePresence>
         {isOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl sm:p-4">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-[#151619] border border-white/10 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col h-[650px] relative"
+              initial={{ opacity: 0, y: '100%' }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="bg-[#1C1C1E] sm:rounded-[40px] shadow-2xl w-full h-full sm:h-[800px] sm:max-w-[375px] overflow-hidden flex flex-col relative text-white"
             >
-              {/* Hardware Style Header */}
-              <div className="p-8 text-center border-b border-white/5 relative bg-gradient-to-b from-white/5 to-transparent">
-                <div className="flex justify-between items-center mb-8">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                    <span className="text-[10px] font-mono uppercase tracking-[2px] text-white/40">Noktel-Core v2.0</span>
-                  </div>
-                  <button 
-                    onClick={() => { endCall(); setIsOpen(false); }}
-                    className="text-white/20 hover:text-white transition-colors"
-                  >
-                    <span className="text-[10px] font-mono uppercase tracking-[2px]">Close</span>
-                  </button>
-                </div>
+              {/* Top Section */}
+              <div className="pt-16 pb-8 flex flex-col items-center">
+                <h2 className="text-3xl font-normal tracking-wide mb-2">AI Receptionist</h2>
+                <p className="text-[#8E8E93] text-sm">
+                  {!isCallActive ? 'Noktel Resort' : (status === 'listening' ? 'listening...' : status === 'speaking' ? 'speaking...' : 'connecting...')}
+                </p>
+              </div>
 
-                <div className="relative inline-block mb-6">
-                  <div className={`absolute inset-0 rounded-full blur-2xl transition-colors duration-500 ${
-                    status === 'speaking' ? 'bg-blue-500/20' : status === 'listening' ? 'bg-amber-500/20' : 'bg-white/5'
-                  }`} />
-                  <div className="w-24 h-24 rounded-full border border-white/10 flex items-center justify-center relative bg-[#151619]">
-                    {isCallActive ? (
-                      <div className="flex items-center gap-1">
-                        {[...Array(4)].map((_, i) => (
-                          <motion.div
-                            key={i}
-                            animate={{ height: status === 'speaking' || status === 'listening' ? [8, 24, 8] : 8 }}
-                            transition={{ repeat: Infinity, duration: 0.5, delay: i * 0.1 }}
-                            className={`w-1 rounded-full ${status === 'speaking' ? 'bg-blue-400' : 'bg-amber-400'}`}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <Phone className="w-8 h-8 text-white/20" />
+              {/* Middle Section - Avatar */}
+              <div className="flex-1 flex items-center justify-center">
+                 <div className="relative w-32 h-32">
+                    {/* Glowing effect when active */}
+                    {isCallActive && (
+                      <div className={`absolute inset-0 rounded-full blur-2xl transition-colors duration-500 ${
+                        status === 'speaking' ? 'bg-blue-500/40' : status === 'listening' ? 'bg-[#34C759]/40' : 'bg-white/10'
+                      }`} />
                     )}
-                  </div>
-                </div>
-
-                <h2 className="text-2xl font-light tracking-tight text-white mb-1">AI Receptionist</h2>
-                <div className="flex items-center justify-center gap-2">
-                  <span className="text-[10px] font-mono uppercase tracking-[2px] text-amber-500/80">
-                    {isCallActive ? (status === 'listening' ? 'System Listening' : status === 'speaking' ? 'System Output' : 'Processing') : 'Standby Mode'}
-                  </span>
-                </div>
+                    <div className="w-full h-full rounded-full bg-gradient-to-b from-[#4A4A4C] to-[#2C2C2E] flex items-center justify-center relative z-10 overflow-hidden">
+                       <User className="w-16 h-16 text-white/50" />
+                    </div>
+                 </div>
               </div>
 
-              {/* Transcript Area - Hardware Feed Style */}
-              <div className="flex-1 p-8 overflow-y-auto space-y-6 scrollbar-hide">
-                {messages.length === 0 && !isCallActive && (
-                  <div className="h-full flex flex-col items-center justify-center text-center">
-                    <div className="w-12 h-12 border border-dashed border-white/10 rounded-full flex items-center justify-center mb-4">
-                      <Mic className="w-5 h-5 text-white/10" />
-                    </div>
-                    <p className="text-white/30 text-xs font-mono uppercase tracking-wider max-w-[200px]">
-                      Initialize secure voice link to begin booking
-                    </p>
-                  </div>
-                )}
-                {messages.map((msg, i) => (
-                  <motion.div 
-                    initial={{ opacity: 0, x: msg.role === 'user' ? 10 : -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    key={i} 
-                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div className={`max-w-[85%] p-4 rounded-2xl text-sm font-light leading-relaxed ${
-                      msg.role === 'user' 
-                        ? 'bg-white/5 border border-white/10 text-white/90 rounded-tr-none' 
-                        : 'bg-amber-500/10 border border-amber-500/20 text-amber-200/90 rounded-tl-none'
-                    }`}>
-                      <div className="text-[9px] font-mono uppercase tracking-wider opacity-40 mb-2">
-                        {msg.role === 'user' ? 'Client' : 'Receptionist'}
+              {/* Bottom Section - Controls */}
+              <div className="pb-12 px-8">
+                {isCallActive ? (
+                  <>
+                    {/* 3x2 Grid */}
+                    <div className="grid grid-cols-3 gap-y-6 gap-x-4 mb-12">
+                      <div className="flex flex-col items-center gap-2">
+                        <button className="w-16 h-16 rounded-full bg-[#333333] flex items-center justify-center hover:bg-[#444444] transition-colors">
+                          <MicOff className="w-7 h-7 text-white" />
+                        </button>
+                        <span className="text-xs text-white">mute</span>
                       </div>
-                      {msg.text}
+                      <div className="flex flex-col items-center gap-2">
+                        <button className="w-16 h-16 rounded-full bg-[#333333] flex items-center justify-center hover:bg-[#444444] transition-colors">
+                          <Grid className="w-7 h-7 text-white" />
+                        </button>
+                        <span className="text-xs text-white">keypad</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-2">
+                        <button className="w-16 h-16 rounded-full bg-[#333333] flex items-center justify-center hover:bg-[#444444] transition-colors">
+                          <Volume2 className="w-7 h-7 text-white" />
+                        </button>
+                        <span className="text-xs text-white">speaker</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-2">
+                        <button className="w-16 h-16 rounded-full bg-[#333333] flex items-center justify-center hover:bg-[#444444] transition-colors opacity-50 cursor-not-allowed">
+                          <Plus className="w-7 h-7 text-white" />
+                        </button>
+                        <span className="text-xs text-white">add call</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-2">
+                        <button className="w-16 h-16 rounded-full bg-[#333333] flex items-center justify-center hover:bg-[#444444] transition-colors opacity-50 cursor-not-allowed">
+                          <Video className="w-7 h-7 text-white" />
+                        </button>
+                        <span className="text-xs text-white">FaceTime</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-2">
+                        <button className="w-16 h-16 rounded-full bg-[#333333] flex items-center justify-center hover:bg-[#444444] transition-colors opacity-50 cursor-not-allowed">
+                          <User className="w-7 h-7 text-white" />
+                        </button>
+                        <span className="text-xs text-white">contacts</span>
+                      </div>
                     </div>
-                  </motion.div>
-                ))}
-              </div>
 
-              {/* Hardware Style Controls */}
-              <div className="p-8 border-t border-white/5 bg-black/20">
-                {!isCallActive ? (
-                  <Button 
-                    size="lg" 
-                    className="w-full h-16 rounded-2xl bg-white text-black hover:bg-white/90 text-sm font-mono uppercase tracking-[2px] transition-all active:scale-95"
-                    onClick={startCall}
-                  >
-                    Establish Connection
-                  </Button>
+                    {/* End Call Button */}
+                    <div className="flex justify-center">
+                      <button 
+                        onClick={() => { endCall(); setIsOpen(false); }}
+                        className="w-16 h-16 rounded-full bg-[#FF3B30] flex items-center justify-center hover:bg-[#FF453A] transition-colors"
+                      >
+                        <PhoneOff className="w-8 h-8 text-white" />
+                      </button>
+                    </div>
+                  </>
                 ) : (
-                  <div className="flex justify-between items-center px-4">
+                  <div className="flex justify-between px-4 mb-8">
                     <div className="flex flex-col items-center gap-2">
-                      <div className={`w-12 h-12 rounded-full border border-white/10 flex items-center justify-center ${status === 'listening' ? 'text-amber-500' : 'text-white/20'}`}>
-                        <Mic className="w-5 h-5" />
-                      </div>
-                      <span className="text-[9px] font-mono uppercase tracking-widest text-white/20">Input</span>
+                      <button 
+                        onClick={() => setIsOpen(false)}
+                        className="w-16 h-16 rounded-full bg-[#FF3B30] flex items-center justify-center hover:bg-[#FF453A] transition-colors"
+                      >
+                        <PhoneOff className="w-8 h-8 text-white" />
+                      </button>
+                      <span className="text-xs text-white">Decline</span>
                     </div>
-
-                    <motion.button 
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/50 flex items-center justify-center group"
-                      onClick={endCall}
-                    >
-                      <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center shadow-[0_0_20px_rgba(239,68,68,0.4)] group-hover:shadow-[0_0_30px_rgba(239,68,68,0.6)] transition-all">
-                        <PhoneOff className="w-6 h-6 text-white" />
-                      </div>
-                    </motion.button>
-
                     <div className="flex flex-col items-center gap-2">
-                      <div className={`w-12 h-12 rounded-full border border-white/10 flex items-center justify-center ${status === 'speaking' ? 'text-blue-500' : 'text-white/20'}`}>
-                        <Volume2 className="w-5 h-5" />
-                      </div>
-                      <span className="text-[9px] font-mono uppercase tracking-widest text-white/20">Output</span>
+                      <button 
+                        onClick={startCall}
+                        className="w-16 h-16 rounded-full bg-[#34C759] flex items-center justify-center hover:bg-[#32D74B] transition-colors"
+                      >
+                        <Phone className="w-8 h-8 text-white" />
+                      </button>
+                      <span className="text-xs text-white">Accept</span>
                     </div>
                   </div>
                 )}
