@@ -356,16 +356,16 @@ export function AIVoiceAssistant() {
               }
             }
           },
-          onerror: (err) => {
+          onerror: (err: any) => {
             console.error("Live API Connection Error:", err);
-            if (err instanceof Event) {
-              setError("Connection failed. Please check your internet connection or try again later.");
-            } else if (err instanceof Error) {
+            if (err instanceof Error) {
               if (err.message.includes("permission")) {
                 setError("Permission denied. Please ensure your API key has 'Multimodal Live API' enabled.");
               } else {
                 setError(`Connection error: ${err.message}`);
               }
+            } else if (typeof err === 'object' && err !== null && 'message' in err) {
+              setError(`Connection error: ${(err as any).message}`);
             } else {
               setError("An unexpected error occurred during the call.");
             }

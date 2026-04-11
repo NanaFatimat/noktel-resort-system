@@ -4,38 +4,70 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
+import { FileText, Download } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+// Dynamically import PDF components to avoid SSR issues
+const PDFDownloadLink = dynamic(
+  () => import('@react-pdf/renderer').then((mod) => mod.PDFDownloadLink),
+  { ssr: false }
+);
+
+// For the PDF component itself, we can import it normally if it doesn't use browser APIs
+// but let's keep it safe
+import { InvoicePDF } from '@/components/booking/InvoicePDF';
+
+// Fallback for dynamic imports if needed, but let's try standard dynamic first
+// Actually, Next.js dynamic might not work perfectly with @react-pdf/renderer in all versions
+// Let's use a simpler approach: import them normally but only render when mounted
 
 function BookingSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const bookingId = searchParams.get('booking_id');
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [bookingData, setBookingData] = useState<any>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    async function updateBooking() {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    async function updateAndFetchBooking() {
       if (!bookingId) {
         setStatus('error');
         return;
       }
 
       try {
-        // Update the booking status to paid
         const bookingRef = doc(db, 'bookings', bookingId);
+        
+        // Update the booking status to paid
         await updateDoc(bookingRef, {
           paymentStatus: 'paid',
           status: 'confirmed'
         });
-        setStatus('success');
+
+        // Fetch the updated booking data
+        const bookingSnap = await getDoc(bookingRef);
+        if (bookingSnap.exists()) {
+          setBookingData({ id: bookingSnap.id, ...bookingSnap.data() });
+          setStatus('success');
+        } else {
+          setStatus('error');
+        }
       } catch (error) {
         console.error('Error updating booking:', error);
         setStatus('error');
       }
     }
 
-    updateBooking();
+    updateAndFetchBooking();
   }, [bookingId]);
 
   return (
@@ -57,8 +89,41 @@ function BookingSuccessContent() {
           <p className="text-slate-600">
             Your booking has been confirmed and paid for. We look forward to hosting you at Noktel Resort.
           </p>
-          <Link href="/">
-            <Button className="mt-4 w-full">Return to Home</Button>
+          
+          {/* Pro Level Receipt Section */}
+          <div className="w-full p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-500">Booking ID:</span>
+              <span className="font-mono font-medium text-slate-900">#{bookingId?.slice(-8).toUpperCase()}</span>
+            </div>
+            
+            {isMounted && bookingData && (
+              <div className="pt-2">
+                <PDFDownloadLink
+                  document={<InvoicePDF booking={bookingData} />}
+                  fileName={`Noktel-Invoice-${bookingId?.slice(-8).toUpperCase()}.pdf`}
+                >
+                  {({ loading: pdfLoading }) => (
+                    <Button 
+                      variant="outline" 
+                      className="w-full gap-2 border-amber-200 hover:bg-amber-50 text-amber-700"
+                      disabled={pdfLoading}
+                    >
+                      {pdfLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <FileText className="w-4 h-4" />
+                      )}
+                      {pdfLoading ? 'Preparing Invoice...' : 'Download PDF Invoice'}
+                    </Button>
+                  )}
+                </PDFDownloadLink>
+              </div>
+            )}
+          </div>
+
+          <Link href="/" className="w-full">
+            <Button className="w-full">Return to Home</Button>
           </Link>
         </div>
       )}
