@@ -160,7 +160,7 @@ function BookingSuccessContent() {
     }
 
     updateAndFetchBooking();
-  }, [bookingId]);
+  }, [bookingId, isAuthReady]);
 
   return (
     <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center space-y-6">

@@ -357,8 +357,21 @@ export function AdminDashboard() {
   }
 
   // Calculate Stats
-  const totalRevenue = bookings.reduce((acc, curr) => acc + curr.totalAmount, 0);
-  const pendingBookings = bookings.filter(b => b.status === 'pending').length;
+  const realizedRevenue = bookings
+    .filter(b => b.paymentStatus === 'paid')
+    .reduce((acc, curr) => acc + curr.totalAmount, 0);
+    
+  const expectedRevenue = bookings
+    .filter(b => b.paymentMethod === 'pay_at_hotel' && b.paymentStatus !== 'paid' && b.status !== 'cancelled')
+    .reduce((acc, curr) => acc + curr.totalAmount, 0);
+
+  const activeBookings = bookings.filter(b => b.status !== 'cancelled');
+  
+  // Pending actions: either status is pending, or it's a confirmed pay_at_hotel booking that hasn't been paid yet
+  const pendingActionBookings = bookings.filter(b => 
+    b.status === 'pending' || 
+    (b.paymentMethod === 'pay_at_hotel' && b.paymentStatus !== 'paid' && b.status === 'confirmed')
+  ).length;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
@@ -419,7 +432,12 @@ export function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-slate-500 font-medium">Total Revenue</p>
-                  <p className="text-2xl font-bold text-slate-900">₦{totalRevenue.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-slate-900">₦{realizedRevenue.toLocaleString()}</p>
+                  {expectedRevenue > 0 && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      + ₦{expectedRevenue.toLocaleString()} Expected (Pay at Hotel)
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
@@ -427,8 +445,8 @@ export function AdminDashboard() {
                   <CalendarDays className="w-7 h-7" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500 font-medium">Total Bookings</p>
-                  <p className="text-2xl font-bold text-slate-900">{bookings.length}</p>
+                  <p className="text-sm text-slate-500 font-medium">Active Bookings</p>
+                  <p className="text-2xl font-bold text-slate-900">{activeBookings.length}</p>
                 </div>
               </div>
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
@@ -437,7 +455,7 @@ export function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-slate-500 font-medium">Pending Action</p>
-                  <p className="text-2xl font-bold text-slate-900">{pendingBookings}</p>
+                  <p className="text-2xl font-bold text-slate-900">{pendingActionBookings}</p>
                 </div>
               </div>
             </div>
