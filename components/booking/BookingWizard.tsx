@@ -161,8 +161,8 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
           throw new Error('Failed to get checkout URL from Stripe');
         }
       } else {
-        // Pay at hotel, just show success
-        setStep(5); // Success step
+        // Pay at hotel, redirect to success page
+        window.location.href = `/booking/success?booking_id=${bookingId}&payment_method=pay_at_hotel`;
       }
     } catch (err: any) {
       console.error(err);

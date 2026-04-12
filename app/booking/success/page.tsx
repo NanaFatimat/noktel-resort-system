@@ -5,8 +5,60 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import Link from 'next/link';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string;
+    email?: string | null;
+    emailVerified?: boolean;
+    isAnonymous?: boolean;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 import { FileText, Download } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -31,36 +83,76 @@ function BookingSuccessContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [bookingData, setBookingData] = useState<any>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsAuthReady(true);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     async function updateAndFetchBooking() {
-      if (!bookingId) {
-        setStatus('error');
+      if (!bookingId || !isAuthReady) {
         return;
       }
 
       try {
         const bookingRef = doc(db, 'bookings', bookingId);
-        
-        // Update the booking status to paid
-        await updateDoc(bookingRef, {
-          paymentStatus: 'paid',
-          status: 'confirmed'
-        });
-
-        // Fetch the updated booking data
-        const bookingSnap = await getDoc(bookingRef);
-        if (bookingSnap.exists()) {
-          setBookingData({ id: bookingSnap.id, ...bookingSnap.data() });
-          setStatus('success');
-        } else {
-          setStatus('error');
+        let bookingSnap;
+        try {
+          bookingSnap = await getDoc(bookingRef);
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, `bookings/${bookingId}`);
+          return;
         }
+        
+        if (!bookingSnap.exists()) {
+          setStatus('error');
+          return;
+        }
+
+        const data = bookingSnap.data();
+        
+        // If it's a Stripe booking, we assume success if they reached this page
+        // (In a real app, we'd verify with a webhook, but this is the success redirect)
+        if (data.paymentMethod === 'stripe' && data.paymentStatus !== 'paid') {
+          try {
+            await updateDoc(bookingRef, {
+              paymentStatus: 'paid',
+              status: 'confirmed'
+            });
+          } catch (error) {
+            handleFirestoreError(error, OperationType.UPDATE, `bookings/${bookingId}`);
+          }
+          // Refresh data after update
+          const updatedSnap = await getDoc(bookingRef);
+          setBookingData({ id: updatedSnap.id, ...updatedSnap.data() });
+        } else if (data.paymentMethod === 'pay_at_hotel') {
+          // For pay at hotel, we just confirm the reservation status if not already
+          if (data.status !== 'confirmed') {
+            try {
+              await updateDoc(bookingRef, {
+                status: 'confirmed'
+              });
+            } catch (error) {
+              handleFirestoreError(error, OperationType.UPDATE, `bookings/${bookingId}`);
+            }
+            const updatedSnap = await getDoc(bookingRef);
+            setBookingData({ id: updatedSnap.id, ...updatedSnap.data() });
+          } else {
+            setBookingData({ id: bookingSnap.id, ...data });
+          }
+        } else {
+          setBookingData({ id: bookingSnap.id, ...data });
+        }
+        
+        setStatus('success');
       } catch (error) {
         console.error('Error updating booking:', error);
         setStatus('error');
@@ -75,8 +167,14 @@ function BookingSuccessContent() {
       {status === 'loading' && (
         <div className="flex flex-col items-center space-y-4">
           <Loader2 className="w-16 h-16 text-amber-500 animate-spin" />
-          <h2 className="text-2xl font-serif font-bold text-slate-900">Confirming Payment...</h2>
-          <p className="text-slate-500">Please wait while we verify your payment.</p>
+          <h2 className="text-2xl font-serif font-bold text-slate-900">
+            {searchParams.get('payment_method') === 'pay_at_hotel' ? 'Securing Reservation...' : 'Confirming Payment...'}
+          </h2>
+          <p className="text-slate-500">
+            {searchParams.get('payment_method') === 'pay_at_hotel' 
+              ? 'Please wait while we finalize your booking.' 
+              : 'Please wait while we verify your payment.'}
+          </p>
         </div>
       )}
 
@@ -85,9 +183,13 @@ function BookingSuccessContent() {
           <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
             <CheckCircle2 className="w-10 h-10" />
           </div>
-          <h2 className="text-2xl font-serif font-bold text-slate-900">Payment Successful!</h2>
+          <h2 className="text-2xl font-serif font-bold text-slate-900">
+            {bookingData?.paymentMethod === 'pay_at_hotel' ? 'Reservation Confirmed!' : 'Payment Successful!'}
+          </h2>
           <p className="text-slate-600">
-            Your booking has been confirmed and paid for. We look forward to hosting you at Noktel Resort.
+            {bookingData?.paymentMethod === 'pay_at_hotel' 
+              ? 'Your reservation is secured. Please pay at the front desk upon arrival.'
+              : 'Your booking has been confirmed and paid for. We look forward to hosting you at Noktel Resort.'}
           </p>
           
           {/* Pro Level Receipt Section */}
@@ -101,7 +203,9 @@ function BookingSuccessContent() {
               <div className="pt-2">
                 <PDFDownloadLink
                   document={<InvoicePDF booking={bookingData} />}
-                  fileName={`Noktel-Invoice-${bookingId?.slice(-8).toUpperCase()}.pdf`}
+                  fileName={bookingData.paymentMethod === 'pay_at_hotel' 
+                    ? `Noktel-Voucher-${bookingId?.slice(-8).toUpperCase()}.pdf`
+                    : `Noktel-Invoice-${bookingId?.slice(-8).toUpperCase()}.pdf`}
                 >
                   {({ loading: pdfLoading }) => (
                     <Button 
@@ -114,7 +218,9 @@ function BookingSuccessContent() {
                       ) : (
                         <FileText className="w-4 h-4" />
                       )}
-                      {pdfLoading ? 'Preparing Invoice...' : 'Download PDF Invoice'}
+                      {pdfLoading 
+                        ? 'Preparing Document...' 
+                        : (bookingData.paymentMethod === 'pay_at_hotel' ? 'Download Reservation Voucher' : 'Download PDF Invoice')}
                     </Button>
                   )}
                 </PDFDownloadLink>

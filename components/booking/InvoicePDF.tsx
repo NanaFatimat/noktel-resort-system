@@ -48,6 +48,22 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     marginBottom: 4,
   },
+  badge: {
+    padding: '4 8',
+    borderRadius: 4,
+    fontSize: 8,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    marginTop: 4,
+  },
+  paidBadge: {
+    backgroundColor: '#DCFCE7', // green-100
+    color: '#166534', // green-800
+  },
+  unpaidBadge: {
+    backgroundColor: '#FEF3C7', // amber-100
+    color: '#92400E', // amber-800
+  },
   section: {
     marginBottom: 20,
   },
@@ -151,6 +167,8 @@ interface InvoiceProps {
     guests: number;
     totalAmount: number;
     createdAt: string;
+    paymentStatus: string;
+    paymentMethod: string;
   };
 }
 
@@ -167,6 +185,9 @@ export const InvoicePDF = ({ booking }: InvoiceProps) => {
     }
   };
 
+  const isPaid = booking.paymentStatus === 'paid';
+  const isPayAtHotel = booking.paymentMethod === 'pay_at_hotel';
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -177,9 +198,12 @@ export const InvoicePDF = ({ booking }: InvoiceProps) => {
             <Text style={styles.logoSubtext}>LUXURY ACCOMMODATION</Text>
           </View>
           <View style={styles.invoiceInfo}>
-            <Text style={styles.invoiceTitle}>INVOICE</Text>
+            <Text style={styles.invoiceTitle}>{isPaid ? 'INVOICE' : 'RESERVATION VOUCHER'}</Text>
             <Text style={styles.value}>#{booking.id.slice(-8).toUpperCase()}</Text>
-            <Text style={styles.label}>Date: {formatDate(booking.createdAt)}</Text>
+            <View style={[styles.badge, isPaid ? styles.paidBadge : styles.unpaidBadge]}>
+              <Text>{isPaid ? 'PAID' : 'PAYMENT DUE AT PROPERTY'}</Text>
+            </View>
+            <Text style={[styles.label, { marginTop: 8 }]}>Date: {formatDate(booking.createdAt)}</Text>
           </View>
         </View>
 
@@ -243,7 +267,7 @@ export const InvoicePDF = ({ booking }: InvoiceProps) => {
         {/* Total */}
         <View style={styles.totalSection}>
           <View style={styles.totalBox}>
-            <Text style={styles.totalLabel}>Total Amount Paid</Text>
+            <Text style={styles.totalLabel}>{isPaid ? 'Total Amount Paid' : 'Total Amount Due'}</Text>
             <Text style={styles.totalValue}>₦{booking.totalAmount.toLocaleString()}</Text>
           </View>
         </View>
@@ -251,7 +275,12 @@ export const InvoicePDF = ({ booking }: InvoiceProps) => {
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Thank you for choosing Noktel Resort Hotel.</Text>
-          <Text style={styles.footerText}>This is a computer-generated receipt and does not require a physical signature.</Text>
+          {!isPaid && (
+            <Text style={[styles.footerText, { fontWeight: 'bold', color: '#0F172A' }]}>
+              Please present this voucher at the front desk upon arrival to complete your payment.
+            </Text>
+          )}
+          <Text style={styles.footerText}>This is a computer-generated document and does not require a physical signature.</Text>
           <Text style={[styles.footerText, { marginTop: 10, color: '#F59E0B' }]}>www.noktelresort.com | +234 800 NOKTEL</Text>
         </View>
       </Page>
