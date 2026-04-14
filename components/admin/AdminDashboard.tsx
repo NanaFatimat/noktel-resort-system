@@ -1,16 +1,41 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { auth, db, storage } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { doc, updateDoc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { LayoutDashboard, CalendarDays, BedDouble, Settings, LogOut, Users, TrendingUp, Image as ImageIcon, Upload, Plus, Trash2 } from 'lucide-react';
 import { useBookings } from '@/hooks/use-bookings';
 import { useRooms } from '@/hooks/use-rooms';
 import { useSettings } from '@/hooks/use-settings';
+
+async function uploadToCloudinary(file: File): Promise<string> {
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+  if (!cloudName || !uploadPreset) {
+    throw new Error("Cloudinary configuration is missing. Please set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.");
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', uploadPreset);
+
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error?.message || 'Failed to upload image to Cloudinary');
+  }
+
+  const data = await response.json();
+  return data.secure_url;
+}
 
 enum OperationType {
   CREATE = 'create',
@@ -151,9 +176,7 @@ export function AdminDashboard() {
     try {
       let imageUrl = editingRoomId ? rooms.find(r => r.id === editingRoomId)?.image || '' : '';
       if (newRoomImage) {
-        const storageRef = ref(storage, `rooms/${Date.now()}-${newRoomImage.name}`);
-        await uploadBytes(storageRef, newRoomImage);
-        imageUrl = await getDownloadURL(storageRef);
+        imageUrl = await uploadToCloudinary(newRoomImage);
       }
 
       const roomData = {
@@ -210,9 +233,7 @@ export function AdminDashboard() {
 
     setUploadingImage(true);
     try {
-      const storageRef = ref(storage, `homepage/hero-${Date.now()}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      const downloadURL = await uploadToCloudinary(file);
       await setDoc(doc(db, 'settings', 'homepage'), {
         heroImage: downloadURL
       }, { merge: true });
@@ -230,9 +251,7 @@ export function AdminDashboard() {
 
     setUploadingRoomsImage(true);
     try {
-      const storageRef = ref(storage, `rooms-page/hero-${Date.now()}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      const downloadURL = await uploadToCloudinary(file);
       await setDoc(doc(db, 'settings', 'homepage'), {
         roomsHeroImage: downloadURL
       }, { merge: true });
@@ -251,9 +270,7 @@ export function AdminDashboard() {
     setUploadingAmenitiesImage(true);
     setDashboardError(null);
     try {
-      const storageRef = ref(storage, `settings/amenities-hero-${Date.now()}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      const downloadURL = await uploadToCloudinary(file);
 
       await setDoc(doc(db, 'settings', 'homepage'), {
         amenitiesHeroImage: downloadURL
@@ -273,9 +290,7 @@ export function AdminDashboard() {
     setUploadingContactImage(true);
     setDashboardError(null);
     try {
-      const storageRef = ref(storage, `settings/contact-hero-${Date.now()}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      const downloadURL = await uploadToCloudinary(file);
 
       await setDoc(doc(db, 'settings', 'homepage'), {
         contactHeroImage: downloadURL
@@ -295,9 +310,7 @@ export function AdminDashboard() {
     setUploadingPoolImage(true);
     setDashboardError(null);
     try {
-      const storageRef = ref(storage, `settings/pool-section-${Date.now()}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      const downloadURL = await uploadToCloudinary(file);
 
       await setDoc(doc(db, 'settings', 'homepage'), {
         poolImage: downloadURL

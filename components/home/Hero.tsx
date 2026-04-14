@@ -61,7 +61,7 @@ export function Hero() {
             </Button>
             <Button size="lg" variant="outline" className="w-full sm:w-auto text-base h-14 px-8 bg-white/10 text-white border-white/30 hover:bg-white/20 hover:text-white backdrop-blur-sm">
               <PhoneCall className="w-5 h-5 mr-2" />
-              Try AI Voice Booking
+              Try Voice Booking
             </Button>
           </div>
         </motion.div>

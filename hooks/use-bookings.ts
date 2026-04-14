@@ -68,6 +68,8 @@ export interface Booking {
   status: 'pending' | 'confirmed' | 'cancelled';
   source: 'web' | 'phone';
   createdAt: string;
+  paymentStatus?: 'paid' | 'unpaid';
+  paymentMethod?: 'pay_at_hotel' | 'stripe';
 }
 
 export function useBookings() {

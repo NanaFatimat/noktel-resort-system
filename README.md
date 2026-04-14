@@ -1,6 +1,6 @@
-# Noktel Resort Booking & AI Voice System
+# Noktel Resort Booking & Voice System
 
-A premium, full-stack hotel management and booking application designed for **Noktel Resort Hotel, Ilorin**. This system combines a modern web booking experience with cutting-edge AI-powered automated call handling.
+A premium, full-stack hotel management and booking application designed for **Noktel Resort Hotel, Ilorin**. This system combines a modern web booking experience with automated call handling.
 
 
 
@@ -8,7 +8,7 @@ A premium, full-stack hotel management and booking application designed for **No
 
 ### 🏨 Guest Experience
 - **Real-time Booking:** Seamless room selection and reservation flow.
-- **AI Voice Assistant:** Integrated AI voice handling for automated booking inquiries and reservations.
+- **Voice Assistant:** Integrated voice handling for automated booking inquiries and reservations.
 - **Premium UI/UX:** High-performance, responsive design with smooth cinematic transitions and glassmorphism elements.
 - **Dynamic Content:** Real-time updates for room availability and pricing.
 
@@ -25,7 +25,8 @@ A premium, full-stack hotel management and booking application designed for **No
 - **Language:** [TypeScript](https://www.typescriptlang.org/)
 - **Styling:** [Tailwind CSS 4](https://tailwindcss.com/)
 - **Animations:** [Framer Motion](https://www.framer.com/motion/)
-- **Database & Auth:** [Firebase](https://firebase.google.com/) (Firestore, Auth, Storage)
+- **Database & Auth:** [Firebase](https://firebase.google.com/) (Firestore, Auth)
+- **Image Hosting:** [Cloudinary](https://cloudinary.com/)
 - **AI Engine:** [Google Gemini API](https://ai.google.dev/)
 - **Icons:** [Lucide React](https://lucide.dev/)
 
@@ -72,6 +73,8 @@ A premium, full-stack hotel management and booking application designed for **No
    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
    NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
    NEXT_PUBLIC_GEMINI_API_KEY=your_gemini_key
+   NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
+   NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=your_cloudinary_upload_preset
    ```
 
 4. **Run the development server:**

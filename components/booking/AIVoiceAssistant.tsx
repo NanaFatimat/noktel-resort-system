@@ -382,7 +382,7 @@ export function AIVoiceAssistant() {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
           },
-          systemInstruction: `You are the AI Receptionist for Noktel Resort Hotel in Ilorin, Nigeria. 
+          systemInstruction: `You are the Receptionist for Noktel Resort Hotel in Ilorin, Nigeria. 
           You are polite, professional, and helpful. Your job is to help customers check room availability and book rooms over the phone.
           Always ask for check-in and check-out dates, and the number of guests.
           If they want to book, use the checkAvailability tool first to find rooms and quote the price.
@@ -470,7 +470,7 @@ export function AIVoiceAssistant() {
             >
               {/* Top Section */}
               <div className="pt-16 pb-8 flex flex-col items-center px-6 text-center">
-                <h2 className="text-3xl font-normal tracking-wide mb-2">AI Receptionist</h2>
+                <h2 className="text-3xl font-normal tracking-wide mb-2">Voice Receptionist</h2>
                 <p className="text-[#8E8E93] text-sm">
                   {error ? (
                     <span className="text-red-400">{error}</span>

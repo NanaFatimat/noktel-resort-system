@@ -19,7 +19,7 @@ const playfair = Playfair_Display({
 
 export const metadata: Metadata = {
   title: 'Noktel Resort Hotel | Luxury in Ilorin',
-  description: 'Experience unmatched luxury and comfort at Noktel Resort Hotel, Ilorin. Book your stay online or use our AI voice assistant.',
+  description: 'Experience unmatched luxury and comfort at Noktel Resort Hotel, Ilorin. Book your stay online or use our automated voice assistant.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
