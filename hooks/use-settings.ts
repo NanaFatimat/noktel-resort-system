@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export interface SiteSettings {
@@ -21,33 +21,35 @@ export function useSettings() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'settings', 'homepage'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setSettings({
-          heroImage: data.heroImage || 'https://picsum.photos/seed/luxuryhotel/1920/1080',
-          roomsHeroImage: data.roomsHeroImage || 'https://picsum.photos/seed/noktelrooms/1920/1080',
-          amenitiesHeroImage: data.amenitiesHeroImage || 'https://picsum.photos/seed/noktelamenities/1920/1080',
-          contactHeroImage: data.contactHeroImage || 'https://picsum.photos/seed/noktelcontact/1920/1080',
-          poolImage: data.poolImage || 'https://picsum.photos/seed/noktelpool/800/1000'
-        });
-      } else {
-        // If no settings doc exists, use defaults
-        setSettings({
-          heroImage: 'https://picsum.photos/seed/luxuryhotel/1920/1080',
-          roomsHeroImage: 'https://picsum.photos/seed/noktelrooms/1920/1080',
-          amenitiesHeroImage: 'https://picsum.photos/seed/noktelamenities/1920/1080',
-          contactHeroImage: 'https://picsum.photos/seed/noktelcontact/1920/1080',
-          poolImage: 'https://picsum.photos/seed/noktelpool/800/1000'
-        });
+    async function fetchSettings() {
+      try {
+        const docSnap = await getDoc(doc(db, 'settings', 'homepage'));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setSettings({
+            heroImage: data.heroImage || 'https://picsum.photos/seed/luxuryhotel/1920/1080',
+            roomsHeroImage: data.roomsHeroImage || 'https://picsum.photos/seed/noktelrooms/1920/1080',
+            amenitiesHeroImage: data.amenitiesHeroImage || 'https://picsum.photos/seed/noktelamenities/1920/1080',
+            contactHeroImage: data.contactHeroImage || 'https://picsum.photos/seed/noktelcontact/1920/1080',
+            poolImage: data.poolImage || 'https://picsum.photos/seed/noktelpool/800/1000'
+          });
+        } else {
+          setSettings({
+            heroImage: 'https://picsum.photos/seed/luxuryhotel/1920/1080',
+            roomsHeroImage: 'https://picsum.photos/seed/noktelrooms/1920/1080',
+            amenitiesHeroImage: 'https://picsum.photos/seed/noktelamenities/1920/1080',
+            contactHeroImage: 'https://picsum.photos/seed/noktelcontact/1920/1080',
+            poolImage: 'https://picsum.photos/seed/noktelpool/800/1000'
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching settings:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching settings:", error);
-      setLoading(false);
-    });
+    }
 
-    return () => unsub();
+    fetchSettings();
   }, []);
 
   return { settings, loading };

@@ -7,9 +7,14 @@ import Image from 'next/image';
 import { useBooking } from '@/components/booking/BookingContext';
 import { useSettings } from '@/hooks/use-settings';
 
-export function Hero() {
+import { SiteSettings } from '@/hooks/use-settings';
+
+export function Hero({ initialSettings }: { initialSettings?: SiteSettings }) {
   const { openBookingModal } = useBooking();
-  const { settings, loading } = useSettings();
+  const { settings: hookSettings, loading } = useSettings();
+  
+  // Use initialSettings if provided (SSR), otherwise fallback to hook
+  const settings = initialSettings || hookSettings;
 
   return (
     <section className="relative h-[90vh] min-h-[600px] flex items-center justify-center overflow-hidden bg-slate-900">

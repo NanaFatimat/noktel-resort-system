@@ -5,17 +5,20 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Users, Maximize, BedDouble, Image as ImageIcon } from 'lucide-react';
 import { useBooking } from '@/components/booking/BookingContext';
-import { useRooms } from '@/hooks/use-rooms';
+import { useRooms, Room } from '@/hooks/use-rooms';
 import Link from 'next/link';
 
 interface RoomShowcaseProps {
   limit?: number;
   hideViewAllButton?: boolean;
+  initialRooms?: Room[];
 }
 
-export function RoomShowcase({ limit, hideViewAllButton = false }: RoomShowcaseProps) {
+export function RoomShowcase({ limit, hideViewAllButton = false, initialRooms }: RoomShowcaseProps) {
   const { openBookingModal } = useBooking();
-  const { rooms, loading } = useRooms();
+  const { rooms: hookRooms, loading } = useRooms();
+
+  const rooms = initialRooms || hookRooms;
 
   // Filter only available rooms for the showcase
   let availableRooms = rooms.filter(room => room.status === 'available');
@@ -43,7 +46,7 @@ export function RoomShowcase({ limit, hideViewAllButton = false }: RoomShowcaseP
           )}
         </div>
 
-        {loading ? (
+        {(!initialRooms && loading) ? (
           <div className="py-20 text-center text-slate-500">Loading rooms...</div>
         ) : availableRooms.length === 0 ? (
           <div className="py-20 text-center text-slate-500">No rooms available at the moment.</div>

@@ -1,21 +1,22 @@
-'use client';
-
 import { Hero } from '@/components/home/Hero';
 import { RoomShowcase } from '@/components/home/RoomShowcase';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import Image from 'next/image';
-import { useSettings } from '@/hooks/use-settings';
-import { motion } from 'motion/react';
+import { getRoomsServer, getSettingsServer } from '@/lib/api';
+import { PoolSection } from '@/components/home/PoolSection';
 
-export default function Home() {
-  const { settings } = useSettings();
+export default async function Home() {
+  const [rooms, settings] = await Promise.all([
+    getRoomsServer(),
+    getSettingsServer()
+  ]);
+
   return (
     <>
-      <Hero />
+      <Hero initialSettings={settings} />
       
-      {/* Featured Rooms Section (Reusing RoomShowcase for now, but in a real app we'd limit it to 3) */}
-      <RoomShowcase limit={3} />
+      {/* Featured Rooms Section */}
+      <RoomShowcase limit={3} initialRooms={rooms} />
 
       {/* Quick Amenities Summary */}
       <section className="py-20 bg-slate-50">
@@ -49,22 +50,7 @@ export default function Home() {
               </div>
             </div>
             <div className="flex-1 relative h-[500px] w-full rounded-2xl overflow-hidden shadow-xl bg-slate-200">
-              {settings.poolImage && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 1 }}
-                  className="relative w-full h-full"
-                >
-                  <Image 
-                    src={settings.poolImage} 
-                    alt="Noktel Pool" 
-                    fill 
-                    className="object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                </motion.div>
-              )}
+              <PoolSection poolImage={settings.poolImage} />
             </div>
           </div>
         </div>
