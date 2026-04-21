@@ -1,9 +1,12 @@
-import firebaseConfig from '../firebase-config.json';
 import { Room } from '@/hooks/use-rooms';
 import { SiteSettings } from '@/hooks/use-settings';
 
 export async function getRoomsServer(): Promise<Room[]> {
-  const projectId = firebaseConfig.projectId;
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  if (!projectId) {
+    console.warn("Missing NEXT_PUBLIC_FIREBASE_PROJECT_ID environment variable");
+    return [];
+  }
   const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rooms`;
   
   try {
@@ -36,9 +39,7 @@ export async function getRoomsServer(): Promise<Room[]> {
 }
 
 export async function getSettingsServer(): Promise<SiteSettings> {
-  const projectId = firebaseConfig.projectId;
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/settings/homepage`;
-  
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const defaultSettings = {
     heroImage: 'https://picsum.photos/seed/luxuryhotel/1920/1080',
     roomsHeroImage: 'https://picsum.photos/seed/noktelrooms/1920/1080',
@@ -46,6 +47,13 @@ export async function getSettingsServer(): Promise<SiteSettings> {
     contactHeroImage: 'https://picsum.photos/seed/noktelcontact/1920/1080',
     poolImage: 'https://picsum.photos/seed/noktelpool/800/1000'
   };
+
+  if (!projectId) {
+    console.warn("Missing NEXT_PUBLIC_FIREBASE_PROJECT_ID environment variable for settings");
+    return defaultSettings;
+  }
+
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/settings/homepage`;
 
   try {
     const res = await fetch(url, { next: { revalidate: 60 } });
