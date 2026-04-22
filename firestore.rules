@@ -162,12 +162,13 @@ service cloud.firestore {
     }
 
     match /bookings/{bookingId} {
-      // Users can read their own bookings. Staff can read all.
-      // A guest won't be able to read their booking after leaving the page without a booking ID token, which is standard.
-      allow read: if isStaffOrAdmin() || (isAuthenticated() && request.auth.uid == resource.data.customerId);
+      // List queries strictly require authentication (own bookings or admin)
+      allow list: if isStaffOrAdmin() || (isAuthenticated() && request.auth.uid == resource.data.customerId);
+      
+      // Get is open: knowing the 20-character random ID acts as a receipt token
+      allow get: if true;
       
       // ANYONE can create a booking (Guest Checkout Support)
-      // If logged in, they must book under their own UID. If guest, we allow it.
       allow create: if isValidBooking(request.resource.data) && 
                     (
                       request.auth == null || 
@@ -175,12 +176,13 @@ service cloud.firestore {
                       isStaffOrAdmin()
                     );
       
-      // Users can update their own bookings (e.g., cancel). Staff can update any.
+      // Guest Checkout Success: Allow unauthenticated users knowing the ID to finalize their specific booking
       allow update: if isValidBooking(request.resource.data) &&
                     request.resource.data.customerId == resource.data.customerId &&
                     (
                       isStaffOrAdmin() || 
-                      (isAuthenticated() && request.auth.uid == resource.data.customerId)
+                      (isAuthenticated() && request.auth.uid == resource.data.customerId) ||
+                      request.auth == null
                     );
                     
       allow delete: if isStaffOrAdmin();
