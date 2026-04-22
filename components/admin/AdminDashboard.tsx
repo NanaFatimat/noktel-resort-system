@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { doc, updateDoc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, CalendarDays, BedDouble, Settings, LogOut, Users, TrendingUp, Image as ImageIcon, Upload, Plus, Trash2 } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, BedDouble, Settings, LogOut, Users, TrendingUp, Image as ImageIcon, Upload, Plus, Trash2, Shield, Key } from 'lucide-react';
 import { useBookings } from '@/hooks/use-bookings';
 import { useRooms } from '@/hooks/use-rooms';
 import { useSettings } from '@/hooks/use-settings';
@@ -95,6 +95,10 @@ export function AdminDashboard() {
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
+  
+  const [isLoginMode, setIsLoginMode] = useState(true);
+  const [inviteCode, setInviteCode] = useState('');
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
 
   const { bookings, loading: bookingsLoading } = useBookings();
   const { rooms, loading: roomsLoading } = useRooms();
@@ -130,13 +134,46 @@ export function AdminDashboard() {
     return () => unsubscribe();
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      if (isLoginMode) {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        if (!inviteCode) {
+          setAuthError('Invite Code is required to register an admin account.');
+          return;
+        }
+        // 1. Create the user
+        const userCred = await createUserWithEmailAndPassword(auth, email, password);
+        
+        // 2. Register as admin using the invite code
+        await setDoc(doc(db, 'admins', userCred.user.uid), {
+          email: userCred.user.email,
+          inviteCode: inviteCode,
+          role: 'admin',
+          createdAt: new Date().toISOString()
+        });
+
+        // 3. Clear the invite code so it can't be reused
+        try {
+          await deleteDoc(doc(db, 'admin_invites', inviteCode));
+        } catch(e) {
+          console.log("Could not clear invite code.");
+        }
+      }
     } catch (err: any) {
-      setAuthError('Invalid email or password. Please try again.');
+      console.error("Auth Error", err);
+      if (err.code === 'auth/email-already-in-use') {
+        setAuthError('Email already in use. Please sign in instead.');
+      } else if (err.message && err.message.includes('Missing or insufficient permissions')) {
+        setAuthError('Invalid or expired Invite Code.');
+        if (auth.currentUser) await signOut(auth);
+      } else {
+        setAuthError(err.message || 'Authentication failed. Please try again.');
+        if (!isLoginMode && auth.currentUser) await signOut(auth);
+      }
     }
   };
 
@@ -336,11 +373,15 @@ export function AdminDashboard() {
           className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100"
         >
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-serif font-bold text-slate-900">Noktel Admin</h1>
-            <p className="text-slate-500 text-sm mt-2">Sign in to manage reservations</p>
+            <h1 className="text-2xl font-serif font-bold text-slate-900">
+              {isLoginMode ? 'Noktel Admin' : 'Register Admin'}
+            </h1>
+            <p className="text-slate-500 text-sm mt-2">
+              {isLoginMode ? 'Sign in to manage reservations' : 'Create your administrator account'}
+            </p>
           </div>
           
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleAuth} className="space-y-4">
             <div>
               <label className="text-sm font-medium text-slate-700">Email</label>
               <input 
@@ -361,8 +402,36 @@ export function AdminDashboard() {
                 required
               />
             </div>
+            
+            {!isLoginMode && (
+              <div>
+                <label className="text-sm font-medium text-slate-700">Invite Code</label>
+                <input 
+                  type="text" 
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1 font-mono uppercase tracking-widest"
+                  placeholder="e.g. NOKTEL-123"
+                  required={!isLoginMode}
+                />
+              </div>
+            )}
+            
             {authError && <p className="text-red-500 text-sm">{authError}</p>}
-            <Button type="submit" className="w-full h-12 text-base">Sign In</Button>
+            
+            <Button type="submit" className="w-full h-12 text-base">
+              {isLoginMode ? 'Sign In' : 'Create Admin Account'}
+            </Button>
+            
+            <div className="text-center mt-4 pt-4 border-t border-slate-100">
+              <button 
+                type="button" 
+                onClick={() => { setIsLoginMode(!isLoginMode); setAuthError(''); }}
+                className="text-sm text-slate-500 hover:text-amber-600 font-medium transition-colors"
+              >
+                {isLoginMode ? "Need to register? Enter an Invite Code" : "Already an admin? Sign in"}
+              </button>
+            </div>
           </form>
         </motion.div>
       </div>
@@ -417,6 +486,12 @@ export function AdminDashboard() {
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}
           >
             <ImageIcon className="w-5 h-5" /> Website Settings
+          </button>
+          <button 
+            onClick={() => setActiveTab('admins')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'admins' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}
+          >
+            <Shield className="w-5 h-5" /> Access Control
           </button>
         </nav>
         <div className="p-4 border-t border-slate-800">
@@ -991,6 +1066,46 @@ export function AdminDashboard() {
                   <p className="text-xs text-slate-500 mt-2">Recommended size: 800x1000px. Max file size: 5MB.</p>
                 </div>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'admins' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+            <h2 className="text-xl font-bold text-slate-900">Security & Access Management</h2>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Create Admin Invite Code</h3>
+              <p className="text-slate-500 mb-6 text-sm">Generate a one-time code to allow your client or staff to create their own admin account. They can use this code on the admin login screen by clicking "Need to register? Enter an Invite Code".</p>
+              
+              {!generatedCode ? (
+                <Button onClick={async () => {
+                  try {
+                    const code = 'NOKTEL-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+                    await setDoc(doc(db, 'admin_invites', code), {
+                      createdBy: user?.email,
+                      createdAt: new Date().toISOString()
+                    });
+                    setGeneratedCode(code);
+                  } catch (err) {
+                    console.error("Failed to generate code:", err);
+                    alert("Failed to generate code. Please check your permissions.");
+                  }
+                }}>
+                  <Key className="w-5 h-5 mr-2" />
+                  Generate Invite Code
+                </Button>
+              ) : (
+                <div className="p-6 bg-amber-50 rounded-xl border border-amber-200 flex flex-col gap-3">
+                  <p className="text-sm font-medium text-amber-900">Share this code securely with the recipient:</p>
+                  <div className="flex items-center gap-4 bg-white p-4 rounded-lg border border-amber-200 w-fit">
+                    <p className="text-3xl font-mono font-bold tracking-widest text-amber-700">{generatedCode}</p>
+                  </div>
+                  <p className="text-xs text-amber-700 max-w-md">When they go to the admin URL, they should select "Register as Admin" and enter this exact code. This code can only be used once.</p>
+                  <Button variant="outline" className="w-fit mt-4 bg-white hover:bg-amber-50" onClick={() => setGeneratedCode(null)}>
+                    Generate Another Code
+                  </Button>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

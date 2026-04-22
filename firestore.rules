@@ -57,6 +57,8 @@ service cloud.firestore {
     }
     
     function isAdmin() {
+      // PRO DEV REGISTRY PATTERN: Exclusively Database Driven
+      // No emails are hardcoded. A user is ONLY an admin if their exact auth UID exists as a document in the /admins/ collection.
       return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
@@ -64,11 +66,20 @@ service cloud.firestore {
       return isAdmin() || (request.auth != null && exists(/databases/$(database)/documents/staff/$(request.auth.uid)));
     }
 
+    match /admin_invites/{inviteId} {
+      allow read: if true;
+      allow write: if isAdmin();
+      allow delete: if request.auth != null; // Allow consumers to delete the code after use
+    }
+
     match /admins/{adminId} {
       // Admins can read the whole list; individuals can read their own status
       allow read: if request.auth != null && (request.auth.uid == adminId || isAdmin());
-      // Only existing admins can create new admins (Bootstrap is done via Firebase Console)
-      allow write: if isAdmin();
+      // Existing admins can create new admins, OR new users can register if they provide a valid invite code
+      allow create: if request.auth != null && request.auth.uid == adminId && (
+        isAdmin() || exists(/databases/$(database)/documents/admin_invites/$(request.resource.data.inviteCode))
+      );
+      allow update, delete: if isAdmin();
     }
 
     match /staff/{staffId} {
@@ -98,12 +109,16 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidRoom(data) {
-      return hasOnlyAllowedFields(['name', 'type', 'price', 'capacity', 'status']) &&
+      return hasOnlyAllowedFields(['name', 'type', 'price', 'capacity', 'status', 'description', 'image', 'size', 'bed']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
              data.type in ['standard', 'deluxe', 'executive'] &&
              data.price is number && data.price >= 0 &&
              data.capacity is number && data.capacity > 0 && data.capacity <= 10 &&
-             data.status in ['available', 'maintenance'];
+             data.status in ['available', 'maintenance'] &&
+             (data.get('description', '') is string) &&
+             (data.get('image', '') is string) &&
+             (data.get('size', '') is string) &&
+             (data.get('bed', '') is string);
     }
 
     function isValidBooking(data) {
