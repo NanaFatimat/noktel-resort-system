@@ -85,7 +85,9 @@ export function useRooms() {
         setRooms(fetchedRooms);
       } catch (err: any) {
         setError(err.message);
-        handleFirestoreError(err, OperationType.LIST, 'rooms');
+        // We log the error but don't throw it via handleFirestoreError
+        // to prevent the UI from completely crashing when unauthenticated
+        console.error('Firestore Error fetching rooms:', err.message);
       } finally {
         setLoading(false);
       }

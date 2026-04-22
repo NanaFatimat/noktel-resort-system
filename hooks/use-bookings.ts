@@ -78,6 +78,14 @@ export function useBookings() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // If there is no user logged in, don't attempt to attach the listener
+    // This prevents the "Missing or insufficient permissions" error on initial load
+    // before the auth state has initialized.
+    if (!auth.currentUser) {
+       setLoading(false);
+       return;
+    }
+
     const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -91,11 +99,13 @@ export function useBookings() {
       console.error("Error fetching bookings:", err);
       setError(err.message);
       setLoading(false);
-      handleFirestoreError(err, OperationType.LIST, 'bookings');
+      // We log the error but we don't throw it as an uncaught exception anymore,
+      // which allows the UI to render and handle the error gracefully.
+      // handleFirestoreError(err, OperationType.LIST, 'bookings');
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [auth.currentUser]);
 
   return { bookings, loading, error };
 }
