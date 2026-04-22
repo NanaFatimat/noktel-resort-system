@@ -57,11 +57,7 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return request.auth != null && (
-        request.auth.token.email == "feraclem@gmail.com" || 
-        request.auth.token.email == "angelina20julie@gmail.com" ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
+      return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     function isStaffOrAdmin() {
@@ -69,8 +65,10 @@ service cloud.firestore {
     }
 
     match /admins/{adminId} {
-      allow read: if request.auth != null && request.auth.uid == adminId;
-      allow write: if false;
+      // Admins can read the whole list; individuals can read their own status
+      allow read: if request.auth != null && (request.auth.uid == adminId || isAdmin());
+      // Only existing admins can create new admins (Bootstrap is done via Firebase Console)
+      allow write: if isAdmin();
     }
 
     match /staff/{staffId} {
