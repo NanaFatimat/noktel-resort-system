@@ -97,13 +97,12 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
     setError('');
     
     try {
-      // Sign in anonymously if not logged in
-      if (!auth.currentUser) {
-        await signInAnonymously(auth);
-      }
+      // If the user isn't logged in, generate a random guest ID instead of forcing Anonymous Auth
+      // This prevents the auth/admin-restricted-operation error without requiring console configuration
+      const customerId = auth.currentUser?.uid || `guest_${Math.random().toString(36).substring(2, 11)}`;
 
       const bookingData = {
-        customerId: auth.currentUser?.uid || 'anonymous',
+        customerId: customerId,
         customerName: guestDetails.name,
         customerEmail: guestDetails.email,
         customerPhone: guestDetails.phone,
