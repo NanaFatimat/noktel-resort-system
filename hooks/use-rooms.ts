@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 
 enum OperationType {
@@ -72,28 +72,22 @@ export function useRooms() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchRooms() {
-      try {
-        // Fetch all rooms for admin, but we might want to filter by status for users
-        // For now, let's fetch all rooms so admin can see maintenance ones too
-        const q = query(collection(db, 'rooms'));
-        const querySnapshot = await getDocs(q);
-        const fetchedRooms: Room[] = [];
-        querySnapshot.forEach((doc) => {
-          fetchedRooms.push({ id: doc.id, ...doc.data() } as Room);
-        });
-        setRooms(fetchedRooms);
-      } catch (err: any) {
-        setError(err.message);
-        // We log the error but don't throw it via handleFirestoreError
-        // to prevent the UI from completely crashing when unauthenticated
-        console.error('Firestore Error fetching rooms:', err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
+    const q = query(collection(db, 'rooms'));
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetchedRooms: Room[] = [];
+      querySnapshot.forEach((doc) => {
+        fetchedRooms.push({ id: doc.id, ...doc.data() } as Room);
+      });
+      setRooms(fetchedRooms);
+      setLoading(false);
+    }, (err: any) => {
+      setError(err.message);
+      console.error('Firestore Error fetching rooms:', err.message);
+      setLoading(false);
+    });
 
-    fetchRooms();
+    return () => unsubscribe();
   }, []);
 
   return { rooms, loading, error };
