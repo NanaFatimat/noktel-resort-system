@@ -610,12 +610,6 @@ export function AdminDashboard() {
           >
             <Shield className="w-5 h-5" /> Access Control
           </button>
-          <button 
-            onClick={() => setActiveTab('admins')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'admins' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}
-          >
-            <Shield className="w-5 h-5" /> Access Control
-          </button>
         </nav>
         <div className="p-4 border-t border-slate-800">
           <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-slate-800 transition-colors">

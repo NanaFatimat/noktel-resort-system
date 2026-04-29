@@ -255,7 +255,7 @@ export const InvoicePDF = ({ booking }: InvoiceProps) => {
           <View style={styles.tableRow}>
             <Text style={styles.col1}>Accommodation: {booking.roomName}</Text>
             <Text style={styles.col2}>1</Text>
-            <Text style={styles.col3}>₦{booking.totalAmount.toLocaleString()}</Text>
+            <Text style={styles.col3}>NGN {booking.totalAmount.toLocaleString()}</Text>
           </View>
           <View style={styles.tableRow}>
             <Text style={styles.col1}>Service Charge & VAT</Text>
@@ -268,7 +268,7 @@ export const InvoicePDF = ({ booking }: InvoiceProps) => {
         <View style={styles.totalSection}>
           <View style={styles.totalBox}>
             <Text style={styles.totalLabel}>{isPaid ? 'Total Amount Paid' : 'Total Amount Due'}</Text>
-            <Text style={styles.totalValue}>₦{booking.totalAmount.toLocaleString()}</Text>
+            <Text style={styles.totalValue}>NGN {booking.totalAmount.toLocaleString()}</Text>
           </View>
         </View>
 
