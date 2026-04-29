@@ -83,6 +83,38 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    async function fetchUserData() {
+      if (auth.currentUser) {
+        try {
+          const { getDoc, doc } = await import('firebase/firestore');
+          // Check if admin
+          let docSnap = await getDoc(doc(db, 'admins', auth.currentUser.uid));
+          if (!docSnap.exists()) {
+            docSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+          }
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setGuestDetails(prev => ({
+              ...prev,
+              name: data.name || prev.name,
+              email: data.email || auth.currentUser?.email || prev.email,
+              phone: data.phone || prev.phone
+            }));
+          } else {
+            setGuestDetails(prev => ({
+              ...prev,
+              email: auth.currentUser?.email || prev.email,
+            }));
+          }
+        } catch (e) {
+          console.error("Failed to fetch user data for prefill:", e);
+        }
+      }
+    }
+    fetchUserData();
+  }, []);
+
   // Calculate total amount
   const calculateTotal = () => {
     if (!checkIn || !checkOut || !selectedRoom) return 0;
