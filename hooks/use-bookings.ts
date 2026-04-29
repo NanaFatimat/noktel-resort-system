@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 
 enum OperationType {
@@ -21,12 +21,6 @@ interface FirestoreErrorInfo {
     emailVerified?: boolean;
     isAnonymous?: boolean;
     tenantId?: string | null;
-    providerInfo?: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
   }
 }
 
@@ -39,18 +33,12 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
       emailVerified: auth.currentUser?.emailVerified,
       isAnonymous: auth.currentUser?.isAnonymous,
       tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
     },
     operationType,
     path
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  // Not throwing to avoid unhandled promise rejection loops in UI components
 }
 
 export interface Booking {
@@ -72,21 +60,25 @@ export interface Booking {
   paymentMethod?: 'pay_at_hotel' | 'stripe';
 }
 
-export function useBookings() {
+export function useBookings(customerId?: string) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // If there is no user logged in, don't attempt to attach the listener
-    // This prevents the "Missing or insufficient permissions" error on initial load
-    // before the auth state has initialized.
     if (!auth.currentUser) {
        setLoading(false);
        return;
     }
 
-    const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'));
+    setLoading(true);
+
+    let q;
+    if (customerId) {
+        q = query(collection(db, 'bookings'), where('customerId', '==', customerId), orderBy('createdAt', 'desc'));
+    } else {
+        q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'));
+    }
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const fetchedBookings: Booking[] = [];
@@ -99,13 +91,10 @@ export function useBookings() {
       console.error("Error fetching bookings:", err);
       setError(err.message);
       setLoading(false);
-      // We log the error but we don't throw it as an uncaught exception anymore,
-      // which allows the UI to render and handle the error gracefully.
-      // handleFirestoreError(err, OperationType.LIST, 'bookings');
     });
 
     return () => unsubscribe();
-  }, [auth.currentUser]);
+  }, [auth.currentUser, customerId]);
 
   return { bookings, loading, error };
 }

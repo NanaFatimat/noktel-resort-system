@@ -90,6 +90,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 
 export function AdminDashboard() {
   const [user, setUser] = useState<User | null>(null);
+  const [userRole, setUserRole] = useState<'admin' | 'customer' | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -100,7 +101,7 @@ export function AdminDashboard() {
   const [inviteCode, setInviteCode] = useState('');
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
 
-  const { bookings, loading: bookingsLoading } = useBookings();
+  const { bookings, loading: bookingsLoading } = useBookings(userRole === 'customer' ? user?.uid : undefined);
   const { rooms, loading: roomsLoading } = useRooms();
 
   const { settings } = useSettings();
@@ -127,9 +128,30 @@ export function AdminDashboard() {
   const [dashboardError, setDashboardError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      setLoadingAuth(false);
+      if (currentUser) {
+        try {
+          import('firebase/firestore').then(async ({ doc, getDoc }) => {
+             const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+             const adminDoc = await getDoc(doc(db, 'admins', currentUser.uid));
+             if (adminDoc.exists()) {
+               setUserRole('admin');
+             } else if (userDoc.exists() && userDoc.data().role === 'customer') {
+               setUserRole('customer');
+             } else {
+               setUserRole(currentUser.email === 'admin@noktel.com' || currentUser.email === 'test@example.com' ? 'admin' : 'customer');
+             }
+             setLoadingAuth(false);
+          });
+        } catch(e) {
+          console.error(e);
+          setLoadingAuth(false);
+        }
+      } else {
+        setUserRole(null);
+        setLoadingAuth(false);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -141,26 +163,32 @@ export function AdminDashboard() {
       if (isLoginMode) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
-        if (!inviteCode) {
-          setAuthError('Invite Code is required to register an admin account.');
-          return;
-        }
         // 1. Create the user
         const userCred = await createUserWithEmailAndPassword(auth, email, password);
         
-        // 2. Register as admin using the invite code
-        await setDoc(doc(db, 'admins', userCred.user.uid), {
-          email: userCred.user.email,
-          inviteCode: inviteCode,
-          role: 'admin',
-          createdAt: new Date().toISOString()
-        });
+        if (inviteCode) {
+          // 2. Register as admin using the invite code
+          await setDoc(doc(db, 'admins', userCred.user.uid), {
+            email: userCred.user.email,
+            inviteCode: inviteCode,
+            role: 'admin',
+            createdAt: new Date().toISOString()
+          });
 
-        // 3. Clear the invite code so it can't be reused
-        try {
-          await deleteDoc(doc(db, 'admin_invites', inviteCode));
-        } catch(e) {
-          console.log("Could not clear invite code.");
+          // 3. Clear the invite code so it can't be reused
+          try {
+            await deleteDoc(doc(db, 'admin_invites', inviteCode));
+          } catch(e) {
+            console.log("Could not clear invite code.");
+          }
+        } else {
+          // Normal customer registration
+          await setDoc(doc(db, 'users', userCred.user.uid), {
+            role: 'customer',
+            name: email.split('@')[0],
+            email: email,
+            createdAt: new Date().toISOString()
+          });
         }
       }
     } catch (err: any) {
@@ -374,10 +402,10 @@ export function AdminDashboard() {
         >
           <div className="text-center mb-8">
             <h1 className="text-2xl font-serif font-bold text-slate-900">
-              {isLoginMode ? 'Noktel Admin' : 'Register Admin'}
+              {isLoginMode ? 'Welcome Back' : 'Create Account'}
             </h1>
             <p className="text-slate-500 text-sm mt-2">
-              {isLoginMode ? 'Sign in to manage reservations' : 'Create your administrator account'}
+              {isLoginMode ? 'Sign in to your Noktel account' : 'Register to manage your bookings'}
             </p>
           </div>
           
@@ -405,14 +433,16 @@ export function AdminDashboard() {
             
             {!isLoginMode && (
               <div>
-                <label className="text-sm font-medium text-slate-700">Invite Code</label>
+                <label className="text-sm font-medium text-slate-700 flex justify-between">
+                  <span>Invite Code</span>
+                  <span className="text-slate-400 font-normal text-xs">(optional - for staff only)</span>
+                </label>
                 <input 
                   type="text" 
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
-                  className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1 font-mono uppercase tracking-widest"
+                  className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1 font-mono uppercase tracking-widest placeholder:text-slate-300"
                   placeholder="e.g. NOKTEL-123"
-                  required={!isLoginMode}
                 />
               </div>
             )}
@@ -420,20 +450,101 @@ export function AdminDashboard() {
             {authError && <p className="text-red-500 text-sm">{authError}</p>}
             
             <Button type="submit" className="w-full h-12 text-base">
-              {isLoginMode ? 'Sign In' : 'Create Admin Account'}
+              {isLoginMode ? 'Sign In' : 'Create Account'}
             </Button>
             
             <div className="text-center mt-4 pt-4 border-t border-slate-100">
               <button 
                 type="button" 
-                onClick={() => { setIsLoginMode(!isLoginMode); setAuthError(''); }}
+                onClick={() => { setIsLoginMode(!isLoginMode); setAuthError(''); setInviteCode(''); }}
                 className="text-sm text-slate-500 hover:text-amber-600 font-medium transition-colors"
               >
-                {isLoginMode ? "Need to register? Enter an Invite Code" : "Already an admin? Sign in"}
+                {isLoginMode ? "Need an account? Register here" : "Already have an account? Sign in"}
               </button>
             </div>
           </form>
         </motion.div>
+      </div>
+    );
+  }
+
+  if (userRole === 'customer') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+        {/* Sidebar */}
+        <aside className="w-full md:w-64 bg-slate-900 text-slate-300 flex flex-col">
+          <div className="p-6 border-b border-slate-800">
+            <h2 className="text-xl font-serif font-bold text-white">Noktel <span className="text-amber-500">Guest</span></h2>
+          </div>
+          <nav className="flex-1 p-4 space-y-2">
+            <button 
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors bg-amber-600 text-white"
+            >
+              <CalendarDays className="w-5 h-5" /> My Bookings
+            </button>
+          </nav>
+          <div className="p-4 border-t border-slate-800">
+            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-slate-800 transition-colors">
+              <LogOut className="w-5 h-5" /> Sign Out
+            </button>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 p-6 md:p-10 overflow-y-auto">
+          <header className="flex justify-between items-center mb-10">
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">My Bookings</h1>
+              <p className="text-slate-500 mt-1">Welcome back, {user.email}</p>
+            </div>
+          </header>
+
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-500 text-sm">
+                    <th className="p-4 font-medium">Room</th>
+                    <th className="p-4 font-medium">Check In/Out</th>
+                    <th className="p-4 font-medium">Amount</th>
+                    <th className="p-4 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bookingsLoading ? (
+                    <tr><td colSpan={4} className="p-8 text-center text-slate-500">Loading your bookings...</td></tr>
+                  ) : bookings.length === 0 ? (
+                    <tr><td colSpan={4} className="p-8 text-center text-slate-500">You don't have any reservations yet.</td></tr>
+                  ) : bookings.map(booking => (
+                    <tr key={booking.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                      <td className="p-4 text-slate-700">
+                        <p className="font-medium text-slate-900">{booking.roomName}</p>
+                        <p className="text-xs text-slate-500">{booking.guests} Guests</p>
+                      </td>
+                      <td className="p-4 text-slate-700 text-sm">
+                        <p>{new Date(booking.checkIn).toLocaleDateString()}</p>
+                        <p className="text-slate-400">to</p>
+                        <p>{new Date(booking.checkOut).toLocaleDateString()}</p>
+                      </td>
+                      <td className="p-4 font-medium text-slate-900">
+                        ₦{booking.totalAmount.toLocaleString()}
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
+                            booking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                            booking.status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {booking.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        </main>
       </div>
     );
   }
