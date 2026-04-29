@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User, sendEmailVerification } from 'firebase/auth';
 import { doc, updateDoc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
@@ -189,6 +189,8 @@ export function AdminDashboard() {
             email: email,
             createdAt: new Date().toISOString()
           });
+          
+          await sendEmailVerification(userCred.user);
         }
       }
     } catch (err: any) {
@@ -469,6 +471,40 @@ export function AdminDashboard() {
   }
 
   if (userRole === 'customer') {
+    if (!user.emailVerified) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row pt-[72px]">
+          <aside className="w-full md:w-64 bg-slate-900 text-slate-300 flex flex-col md:h-[calc(100vh-72px)] sticky top-[72px]">
+            <div className="p-6 border-b border-slate-800">
+              <h2 className="text-xl font-serif font-bold text-white">Noktel <span className="text-amber-500">Guest</span></h2>
+            </div>
+            <div className="p-4 border-t border-slate-800 mt-auto">
+              <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-slate-800 transition-colors">
+                <LogOut className="w-5 h-5" /> Sign Out
+              </button>
+            </div>
+          </aside>
+          <main className="flex-1 p-6 md:p-10 flex items-center justify-center">
+             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 max-w-md w-full text-center">
+                 <Shield className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+                 <h2 className="text-2xl font-bold text-slate-900 mb-2">Verify your email</h2>
+                 <p className="text-slate-500 mb-6">We&apos;ve sent a verification link to {user.email}. Please check your inbox and verify your account to access your bookings. You may need to refresh the page after verifying.</p>
+                 <Button className="w-full" onClick={async () => {
+                     try {
+                         await sendEmailVerification(user);
+                         alert("Verification email resent!");
+                     } catch(e) {
+                         alert("Wait a moment before requesting another email.");
+                     }
+                 }}>
+                    Resend Verification Email
+                 </Button>
+             </div>
+          </main>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row pt-[72px]">
         {/* Sidebar */}

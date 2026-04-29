@@ -38,17 +38,23 @@ export function Navbar() {
       if (currentUser) {
         try {
           const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          let finalRole = 'Guest';
           if (userDoc.exists() && userDoc.data().role) {
-            setUserRole(userDoc.data().role.charAt(0).toUpperCase() + userDoc.data().role.slice(1));
+            finalRole = userDoc.data().role.charAt(0).toUpperCase() + userDoc.data().role.slice(1);
           } else if (currentUser.email === 'admin@noktel.com' || currentUser.email === 'test@example.com') { // fallback
-            setUserRole('Admin');
-          } else {
-            setUserRole('Guest');
+            finalRole = 'Admin';
           }
+          setUserRole(finalRole);
+          document.cookie = `noktel_role=${finalRole.toLowerCase()}; path=/;`;
         } catch (error) {
           console.error("Error fetching user role:", error);
-          setUserRole(currentUser.email === 'admin@noktel.com' ? 'Admin' : 'Guest');
+          const fallbackRole = currentUser.email === 'admin@noktel.com' ? 'Admin' : 'Guest';
+          setUserRole(fallbackRole);
+          document.cookie = `noktel_role=${fallbackRole.toLowerCase()}; path=/;`;
         }
+      } else {
+        setUserRole('Guest');
+        document.cookie = "noktel_role=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       }
       setAuthLoading(false);
     });
