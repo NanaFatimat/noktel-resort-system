@@ -202,7 +202,7 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
                 className="space-y-6"
               >
                 <h3 className="text-lg font-semibold text-slate-900">When would you like to stay?</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-slate-700">Check-in Date</label>
                     <input 
@@ -210,7 +210,7 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
                       value={checkIn}
                       onChange={(e) => setCheckIn(e.target.value)}
                       min={new Date().toISOString().split('T')[0]}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                      className="w-full p-2.5 md:p-3 text-sm md:text-base border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
                     />
                   </div>
                   <div className="space-y-2">
@@ -220,7 +220,7 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
                       value={checkOut}
                       onChange={(e) => setCheckOut(e.target.value)}
                       min={checkIn || new Date().toISOString().split('T')[0]}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                      className="w-full p-2.5 md:p-3 text-sm md:text-base border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
@@ -228,12 +228,12 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
                     <div className="flex items-center gap-4">
                       <button 
                         onClick={() => setGuests(Math.max(1, guests - 1))}
-                        className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50"
+                        className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors"
                       >-</button>
-                      <span className="text-lg font-medium w-4 text-center">{guests}</span>
+                      <span className="text-lg font-medium w-6 text-center">{guests}</span>
                       <button 
                         onClick={() => setGuests(Math.min(10, guests + 1))}
-                        className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50"
+                        className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors"
                       >+</button>
                     </div>
                   </div>
