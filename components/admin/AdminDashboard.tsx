@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User, sendEmailVerification } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, updateDoc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, CalendarDays, BedDouble, Settings, LogOut, Users, TrendingUp, Image as ImageIcon, Upload, Plus, Trash2, Shield, Key } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, BedDouble, Settings, LogOut, Users, TrendingUp, Image as ImageIcon, Upload, Plus, Trash2, Shield, Key, Eye, EyeOff } from 'lucide-react';
 import { useBookings } from '@/hooks/use-bookings';
 import { useRooms } from '@/hooks/use-rooms';
 import { useSettings } from '@/hooks/use-settings';
@@ -92,9 +92,14 @@ export function AdminDashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<'admin' | 'customer' | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   
   const [isLoginMode, setIsLoginMode] = useState(true);
@@ -173,6 +178,10 @@ export function AdminDashboard() {
         if (inviteCode) {
           // 2. Register as admin using the invite code
           await setDoc(doc(db, 'admins', userCred.user.uid), {
+            firstName,
+            lastName,
+            name: `${firstName} ${lastName}`.trim() || email.split('@')[0],
+            phone,
             email: userCred.user.email,
             inviteCode: inviteCode,
             role: 'admin',
@@ -189,7 +198,10 @@ export function AdminDashboard() {
           // Normal customer registration
           await setDoc(doc(db, 'users', userCred.user.uid), {
             role: 'customer',
-            name: email.split('@')[0],
+            firstName,
+            lastName,
+            name: `${firstName} ${lastName}`.trim() || email.split('@')[0],
+            phone,
             email: email,
             createdAt: new Date().toISOString()
           });
@@ -208,6 +220,22 @@ export function AdminDashboard() {
         setAuthError(err.message || 'Authentication failed. Please try again.');
         if (!isLoginMode && auth.currentUser) await signOut(auth);
       }
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!email) {
+      setAuthError('Please enter your email address to reset your password.');
+      return;
+    }
+    setAuthError('');
+    setResetEmailSent(false);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setResetEmailSent(true);
+    } catch (error: any) {
+      console.error(error);
+      setAuthError(error.message || 'Failed to send password reset email.');
     }
   };
 
@@ -416,6 +444,42 @@ export function AdminDashboard() {
           </div>
           
           <form onSubmit={handleAuth} className="space-y-4">
+            {!isLoginMode && (
+              <>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-slate-700">First Name</label>
+                    <input 
+                      type="text" 
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
+                      required
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-slate-700">Last Name</label>
+                    <input 
+                      type="text" 
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-700">Phone Number</label>
+                  <input 
+                    type="tel" 
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
+                    required
+                  />
+                </div>
+              </>
+            )}
             <div>
               <label className="text-sm font-medium text-slate-700">Email</label>
               <input 
@@ -427,14 +491,34 @@ export function AdminDashboard() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700">Password</label>
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
-                required
-              />
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-slate-700">Password</label>
+                {isLoginMode && (
+                  <button 
+                    type="button" 
+                    onClick={handlePasswordReset}
+                    className="text-xs text-amber-600 hover:text-amber-700 font-medium"
+                  >
+                    Forgot Password?
+                  </button>
+                )}
+              </div>
+              <div className="relative mt-1">
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
             
             {!isLoginMode && (
@@ -453,6 +537,7 @@ export function AdminDashboard() {
               </div>
             )}
             
+            {resetEmailSent && <p className="text-green-600 text-sm">Password reset email sent. Please check your inbox.</p>}
             {authError && <p className="text-red-500 text-sm">{authError}</p>}
             
             <Button type="submit" className="w-full h-12 text-base">
