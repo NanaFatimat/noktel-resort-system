@@ -1,5 +1,5 @@
-import { AdminDashboard } from '@/components/admin/AdminDashboard';
+import { CustomerDashboard } from '@/components/customer/CustomerDashboard';
 
 export default function AccountPage() {
-  return <AdminDashboard />;
+  return <CustomerDashboard />;
 }
