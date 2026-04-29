@@ -177,11 +177,16 @@ service cloud.firestore {
                     );
       
       // Guest Checkout Success: Allow unauthenticated users knowing the ID to finalize their specific booking
+      // And allow authenticated users to claim guest bookings
       allow update: if isValidBooking(request.resource.data) &&
-                    request.resource.data.customerId == resource.data.customerId &&
+                    (
+                      request.resource.data.customerId == resource.data.customerId ||
+                      (resource.data.customerId.matches('^guest_.*') && request.resource.data.customerId == request.auth.uid)
+                    ) &&
                     (
                       isStaffOrAdmin() || 
                       (isAuthenticated() && request.auth.uid == resource.data.customerId) ||
+                      (isAuthenticated() && request.auth.uid == request.resource.data.customerId && resource.data.customerId.matches('^guest_.*')) ||
                       request.auth == null
                     );
                     

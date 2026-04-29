@@ -2,11 +2,11 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2, UserPlus, KeyRound, ArrowRight, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import Link from 'next/link';
 
 enum OperationType {
@@ -84,6 +84,59 @@ function BookingSuccessContent() {
   const [bookingData, setBookingData] = useState<any>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isLinked, setIsLinked] = useState(false);
+  
+  // Account Form State
+  const [isLoginMode, setIsLoginMode] = useState(false);
+  const [password, setPassword] = useState('');
+  const [linkingLoading, setLinkingLoading] = useState(false);
+  const [linkingError, setLinkingError] = useState('');
+
+  const handleLinkAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password || !bookingData) return;
+    
+    setLinkingLoading(true);
+    setLinkingError('');
+    
+    try {
+      let userCred;
+      if (isLoginMode) {
+        userCred = await signInWithEmailAndPassword(auth, bookingData.customerEmail, password);
+      } else {
+        userCred = await createUserWithEmailAndPassword(auth, bookingData.customerEmail, password);
+        // Create user document
+        await setDoc(doc(db, 'users', userCred.user.uid), {
+          role: 'customer',
+          name: bookingData.customerName,
+          email: bookingData.customerEmail,
+          createdAt: new Date().toISOString()
+        });
+      }
+      
+      // Update booking to link it to the user
+      await updateDoc(doc(db, 'bookings', bookingId as string), {
+        customerId: userCred.user.uid
+      });
+      
+      // Refresh booking data state so UI reflects the real link
+      setBookingData((prev: any) => ({ ...prev, customerId: userCred.user.uid }));
+      setIsLinked(true);
+    } catch (err: any) {
+      if (err.code === 'auth/email-already-in-use') {
+        setLinkingError('This email is already registered. Please sign in instead.');
+        setIsLoginMode(true);
+      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setLinkingError('Incorrect password. Please try again.');
+      } else if (err.code === 'auth/weak-password') {
+        setLinkingError('Password is too weak. Must be at least 6 characters.');
+      } else {
+        setLinkingError(err.message || 'An error occurred. Please try again.');
+      }
+    } finally {
+      setLinkingLoading(false);
+    }
+  };
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -193,7 +246,7 @@ function BookingSuccessContent() {
           </p>
           
           {/* Pro Level Receipt Section */}
-          <div className="w-full p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
+          <div className="w-full p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3 mt-4">
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-500">Booking ID:</span>
               <span className="font-mono font-medium text-slate-900">#{bookingId?.slice(-8).toUpperCase()}</span>
@@ -227,6 +280,79 @@ function BookingSuccessContent() {
               </div>
             )}
           </div>
+
+          {/* Account Tracking Prompt */}
+          {bookingData?.customerId?.startsWith('guest_') && !isLinked && (
+            <div className="w-full text-left bg-amber-50 border border-amber-100 rounded-xl p-5 mt-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 leading-tight">Track Your Booking</h3>
+                  <p className="text-xs text-slate-600 mt-1">
+                    {isLoginMode 
+                      ? "Sign in to keep track of this reservation." 
+                      : "Create a password for your account to track your reservation easily."}
+                  </p>
+                </div>
+              </div>
+              
+              <form onSubmit={handleLinkAccount} className="space-y-3 mt-4">
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="password"
+                    placeholder="Enter a secure password"
+                    className="w-full pl-9 pr-3 py-2.5 text-sm bg-white border border-amber-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                </div>
+                
+                {linkingError && (
+                  <p className="text-red-500 text-xs font-medium">{linkingError}</p>
+                )}
+                
+                <Button 
+                  type="submit" 
+                  disabled={linkingLoading || !password}
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  {linkingLoading ? (
+                    <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Processing...</span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                       {isLoginMode ? 'Sign In & Link Booking' : 'Create Account'} <ArrowRight className="w-4 h-4" />
+                    </span>
+                  )}
+                </Button>
+              </form>
+              
+              <div className="mt-4 text-center">
+                <button 
+                  onClick={() => { setIsLoginMode(!isLoginMode); setLinkingError(''); setPassword(''); }}
+                  className="text-xs font-medium text-amber-700 hover:text-amber-800 underline underline-offset-2"
+                >
+                  {isLoginMode ? "Need a new account? Create one" : "Already have an account? Sign in"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isLinked && (
+            <div className="w-full text-left bg-emerald-50 border border-emerald-100 rounded-xl p-5 mt-6 shadow-sm flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                <Check className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-bold text-emerald-900 leading-tight">Account Connected</h3>
+                <p className="text-xs text-emerald-700 mt-1">Your booking has been saved to your account. You can log in anytime to view it.</p>
+              </div>
+            </div>
+          )}
 
           <Link href="/" className="w-full">
             <Button className="w-full">Return to Home</Button>

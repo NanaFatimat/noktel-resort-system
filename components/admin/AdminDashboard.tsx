@@ -493,6 +493,12 @@ export function AdminDashboard() {
           >
             <Shield className="w-5 h-5" /> Access Control
           </button>
+          <button 
+            onClick={() => setActiveTab('admins')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'admins' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}
+          >
+            <Shield className="w-5 h-5" /> Access Control
+          </button>
         </nav>
         <div className="p-4 border-t border-slate-800">
           <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-slate-800 transition-colors">
@@ -1066,6 +1072,46 @@ export function AdminDashboard() {
                   <p className="text-xs text-slate-500 mt-2">Recommended size: 800x1000px. Max file size: 5MB.</p>
                 </div>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'admins' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+            <h2 className="text-xl font-bold text-slate-900">Security & Access Management</h2>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Create Admin Invite Code</h3>
+              <p className="text-slate-500 mb-6 text-sm">Generate a one-time code to allow your client or staff to create their own admin account. They can use this code on the admin login screen by clicking "Need to register? Enter an Invite Code".</p>
+              
+              {!generatedCode ? (
+                <Button onClick={async () => {
+                  try {
+                    const code = 'NOKTEL-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+                    await setDoc(doc(db, 'admin_invites', code), {
+                      createdBy: user?.email,
+                      createdAt: new Date().toISOString()
+                    });
+                    setGeneratedCode(code);
+                  } catch (err) {
+                    console.error("Failed to generate code:", err);
+                    alert("Failed to generate code. Please check your permissions.");
+                  }
+                }}>
+                  <Key className="w-5 h-5 mr-2" />
+                  Generate Invite Code
+                </Button>
+              ) : (
+                <div className="p-6 bg-amber-50 rounded-xl border border-amber-200 flex flex-col gap-3">
+                  <p className="text-sm font-medium text-amber-900">Share this code securely with the recipient:</p>
+                  <div className="flex items-center gap-4 bg-white p-4 rounded-lg border border-amber-200 w-fit">
+                    <p className="text-3xl font-mono font-bold tracking-widest text-amber-700">{generatedCode}</p>
+                  </div>
+                  <p className="text-xs text-amber-700 max-w-md">When they go to the admin URL, they should select "Register as Admin" and enter this exact code. This code can only be used once.</p>
+                  <Button variant="outline" className="w-fit mt-4 bg-white hover:bg-amber-50" onClick={() => setGeneratedCode(null)}>
+                    Generate Another Code
+                  </Button>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
