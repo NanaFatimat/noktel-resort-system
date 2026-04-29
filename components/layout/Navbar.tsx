@@ -15,7 +15,7 @@ export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const forceDarkText = pathname?.startsWith('/admin') || pathname?.startsWith('/booking');
+  const forceDarkText = pathname?.startsWith('/admin') || pathname?.startsWith('/account') || pathname?.startsWith('/booking');
   const forceScrolledStyle = isScrolled || forceDarkText;
 
   const { openBookingModal } = useBooking();
@@ -131,7 +131,7 @@ export function Navbar() {
                           <p className="text-sm font-medium text-slate-900 truncate">{user.email}</p>
                           <p className="text-xs text-slate-500 capitalize mt-0.5">{userRole} Account</p>
                         </div>
-                        <Link href="/admin" className="flex flex-col">
+                        <Link href="/account" className="flex flex-col">
                           <span className="px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2">
                             <Menu className="w-4 h-4" /> Dashboard
                           </span>
@@ -147,7 +147,7 @@ export function Navbar() {
                   </AnimatePresence>
                 </div>
               ) : (
-                <Link href="/admin">
+                <Link href="/account">
                   <Button variant="ghost" className={forceScrolledStyle ? 'text-slate-700 hover:bg-slate-100' : 'text-white hover:bg-white/20'}>
                     Sign In
                   </Button>
@@ -161,7 +161,7 @@ export function Navbar() {
           {/* Mobile Menu Toggle */}
           <div className="flex md:hidden items-center gap-3">
              {!authLoading && user && (
-              <Link href="/admin">
+              <Link href="/account">
                 <Button variant={forceScrolledStyle ? 'outline' : 'secondary'} size="icon" className="w-9 h-9 rounded-full">
                   <User className="w-4 h-4" />
                 </Button>
@@ -189,7 +189,7 @@ export function Navbar() {
             <div className="container mx-auto px-4 py-4 flex flex-col gap-2">
               {!authLoading && !user && (
                 <Link
-                  href="/admin"
+                  href="/account"
                   className="flex items-center gap-3 text-slate-700 font-medium py-3 px-4 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100 mb-2"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >

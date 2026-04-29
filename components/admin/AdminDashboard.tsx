@@ -514,7 +514,7 @@ export function AdminDashboard() {
                   {bookingsLoading ? (
                     <tr><td colSpan={4} className="p-8 text-center text-slate-500">Loading your bookings...</td></tr>
                   ) : bookings.length === 0 ? (
-                    <tr><td colSpan={4} className="p-8 text-center text-slate-500">You don't have any reservations yet.</td></tr>
+                    <tr><td colSpan={4} className="p-8 text-center text-slate-500">You do not have any reservations yet.</td></tr>
                   ) : bookings.map(booking => (
                     <tr key={booking.id} className="border-b border-slate-50 hover:bg-slate-50/50">
                       <td className="p-4 text-slate-700">
@@ -1192,7 +1192,7 @@ export function AdminDashboard() {
             <h2 className="text-xl font-bold text-slate-900">Security & Access Management</h2>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
               <h3 className="text-lg font-bold text-slate-900 mb-2">Create Admin Invite Code</h3>
-              <p className="text-slate-500 mb-6 text-sm">Generate a one-time code to allow your client or staff to create their own admin account. They can use this code on the admin login screen by clicking "Need to register? Enter an Invite Code".</p>
+              <p className="text-slate-500 mb-6 text-sm">Generate a one-time code to allow your client or staff to create their own admin account. They can use this code on the login screen by clicking &quot;Need an account? Register here&quot;.</p>
               
               {!generatedCode ? (
                 <Button onClick={async () => {
@@ -1217,47 +1217,7 @@ export function AdminDashboard() {
                   <div className="flex items-center gap-4 bg-white p-4 rounded-lg border border-amber-200 w-fit">
                     <p className="text-3xl font-mono font-bold tracking-widest text-amber-700">{generatedCode}</p>
                   </div>
-                  <p className="text-xs text-amber-700 max-w-md">When they go to the admin URL, they should select "Register as Admin" and enter this exact code. This code can only be used once.</p>
-                  <Button variant="outline" className="w-fit mt-4 bg-white hover:bg-amber-50" onClick={() => setGeneratedCode(null)}>
-                    Generate Another Code
-                  </Button>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {activeTab === 'admins' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-            <h2 className="text-xl font-bold text-slate-900">Security & Access Management</h2>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900 mb-2">Create Admin Invite Code</h3>
-              <p className="text-slate-500 mb-6 text-sm">Generate a one-time code to allow your client or staff to create their own admin account. They can use this code on the admin login screen by clicking "Need to register? Enter an Invite Code".</p>
-              
-              {!generatedCode ? (
-                <Button onClick={async () => {
-                  try {
-                    const code = 'NOKTEL-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-                    await setDoc(doc(db, 'admin_invites', code), {
-                      createdBy: user?.email,
-                      createdAt: new Date().toISOString()
-                    });
-                    setGeneratedCode(code);
-                  } catch (err) {
-                    console.error("Failed to generate code:", err);
-                    alert("Failed to generate code. Please check your permissions.");
-                  }
-                }}>
-                  <Key className="w-5 h-5 mr-2" />
-                  Generate Invite Code
-                </Button>
-              ) : (
-                <div className="p-6 bg-amber-50 rounded-xl border border-amber-200 flex flex-col gap-3">
-                  <p className="text-sm font-medium text-amber-900">Share this code securely with the recipient:</p>
-                  <div className="flex items-center gap-4 bg-white p-4 rounded-lg border border-amber-200 w-fit">
-                    <p className="text-3xl font-mono font-bold tracking-widest text-amber-700">{generatedCode}</p>
-                  </div>
-                  <p className="text-xs text-amber-700 max-w-md">When they go to the admin URL, they should select "Register as Admin" and enter this exact code. This code can only be used once.</p>
+                  <p className="text-xs text-amber-700 max-w-md">When they go to the account URL, they should select &quot;Create Account&quot; and enter this exact code. This code can only be used once.</p>
                   <Button variant="outline" className="w-fit mt-4 bg-white hover:bg-amber-50" onClick={() => setGeneratedCode(null)}>
                     Generate Another Code
                   </Button>

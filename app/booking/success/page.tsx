@@ -139,7 +139,6 @@ function BookingSuccessContent() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
