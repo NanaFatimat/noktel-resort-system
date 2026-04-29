@@ -380,7 +380,7 @@ function BookingSuccessContent() {
 
 export default function BookingSuccessPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 pt-[72px]">
       <Suspense fallback={
         <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center space-y-6">
           <div className="flex flex-col items-center space-y-4">

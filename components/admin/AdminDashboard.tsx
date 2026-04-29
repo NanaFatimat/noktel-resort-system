@@ -389,12 +389,12 @@ export function AdminDashboard() {
   };
 
   if (loadingAuth) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50">Loading...</div>;
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50 pt-20">Loading...</div>;
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 pt-20">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -470,9 +470,9 @@ export function AdminDashboard() {
 
   if (userRole === 'customer') {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+      <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row pt-[72px]">
         {/* Sidebar */}
-        <aside className="w-full md:w-64 bg-slate-900 text-slate-300 flex flex-col">
+        <aside className="w-full md:w-64 bg-slate-900 text-slate-300 flex flex-col md:h-[calc(100vh-72px)] sticky top-[72px]">
           <div className="p-6 border-b border-slate-800">
             <h2 className="text-xl font-serif font-bold text-white">Noktel <span className="text-amber-500">Guest</span></h2>
           </div>
@@ -567,9 +567,9 @@ export function AdminDashboard() {
   ).length;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row pt-[72px]">
       {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-slate-900 text-slate-300 flex flex-col">
+      <aside className="w-full md:w-64 bg-slate-900 text-slate-300 flex flex-col md:h-[calc(100vh-72px)] sticky top-[72px]">
         <div className="p-6 border-b border-slate-800">
           <h2 className="text-xl font-serif font-bold text-white">Noktel <span className="text-amber-500">Admin</span></h2>
         </div>

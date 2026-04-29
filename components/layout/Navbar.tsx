@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Menu, X, Phone, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'motion/react';
@@ -13,6 +14,10 @@ import { doc, getDoc } from 'firebase/firestore';
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const forceDarkText = pathname?.startsWith('/admin') || pathname?.startsWith('/booking');
+  const forceScrolledStyle = isScrolled || forceDarkText;
+
   const { openBookingModal } = useBooking();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userRole, setUserRole] = useState<string>('Guest');
@@ -66,14 +71,14 @@ export function Navbar() {
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? 'bg-white/95 backdrop-blur-md shadow-sm py-3' : 'bg-transparent py-5'
+        forceScrolledStyle ? 'bg-white/95 backdrop-blur-md shadow-sm py-3' : 'bg-transparent py-5'
       }`}
     >
       <div className="container mx-auto px-4 md:px-6">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className={`font-serif text-2xl font-bold tracking-tight ${isScrolled ? 'text-slate-900' : 'text-white'}`}>
+            <div className={`font-serif text-2xl font-bold tracking-tight ${forceScrolledStyle ? 'text-slate-900' : 'text-white'}`}>
               Noktel <span className="text-amber-500">Resort</span>
             </div>
           </Link>
@@ -85,7 +90,7 @@ export function Navbar() {
                 key={link.name}
                 href={link.href}
                 className={`text-sm font-medium transition-colors hover:text-amber-500 ${
-                  isScrolled ? 'text-slate-600' : 'text-white/90'
+                  forceScrolledStyle ? 'text-slate-600' : 'text-white/90'
                 }`}
               >
                 {link.name}
@@ -95,7 +100,7 @@ export function Navbar() {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-4 relative">
-            <Button variant={isScrolled ? 'outline' : 'secondary'} className="hidden lg:flex gap-2">
+            <Button variant={forceScrolledStyle ? 'outline' : 'secondary'} className="hidden lg:flex gap-2">
               <Phone className="w-4 h-4" />
               <span>+234 800 NOKTEL</span>
             </Button>
@@ -104,7 +109,7 @@ export function Navbar() {
               user ? (
                 <div className="relative">
                   <Button 
-                    variant={isScrolled ? 'outline' : 'secondary'} 
+                    variant={forceScrolledStyle ? 'outline' : 'secondary'} 
                     size="icon" 
                     className="rounded-full flex items-center justify-center p-0 w-10 h-10"
                     onClick={() => setShowUserMenu(!showUserMenu)}
@@ -143,7 +148,7 @@ export function Navbar() {
                 </div>
               ) : (
                 <Link href="/admin">
-                  <Button variant="ghost" className={isScrolled ? 'text-slate-700 hover:bg-slate-100' : 'text-white hover:bg-white/20'}>
+                  <Button variant="ghost" className={forceScrolledStyle ? 'text-slate-700 hover:bg-slate-100' : 'text-white hover:bg-white/20'}>
                     Sign In
                   </Button>
                 </Link>
@@ -157,13 +162,13 @@ export function Navbar() {
           <div className="flex md:hidden items-center gap-3">
              {!authLoading && user && (
               <Link href="/admin">
-                <Button variant={isScrolled ? 'outline' : 'secondary'} size="icon" className="w-9 h-9 rounded-full">
+                <Button variant={forceScrolledStyle ? 'outline' : 'secondary'} size="icon" className="w-9 h-9 rounded-full">
                   <User className="w-4 h-4" />
                 </Button>
               </Link>
              )}
             <button
-              className={`p-2 rounded-lg transition-colors ${isScrolled ? 'text-slate-900 hover:bg-slate-100' : 'text-white hover:bg-white/20'}`}
+              className={`p-2 rounded-lg transition-colors ${forceScrolledStyle ? 'text-slate-900 hover:bg-slate-100' : 'text-white hover:bg-white/20'}`}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
               {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}

@@ -10,7 +10,7 @@ export default function ContactPage() {
   const { settings, loading } = useSettings();
 
   return (
-    <div className="pt-24 pb-20">
+    <div className="pb-20">
       {/* Page Header */}
       <section className="relative h-[40vh] min-h-[300px] flex items-center justify-center overflow-hidden mb-16 bg-slate-900">
         <div className="absolute inset-0 z-0">

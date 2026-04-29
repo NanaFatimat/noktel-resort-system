@@ -9,7 +9,7 @@ export default function RoomsPage() {
   const { settings, loading } = useSettings();
 
   return (
-    <div className="pt-24 pb-12">
+    <div className="pb-12">
       {/* Page Header */}
       <section className="relative h-[40vh] min-h-[300px] flex items-center justify-center overflow-hidden mb-12 bg-slate-900">
         <div className="absolute inset-0 z-0">
