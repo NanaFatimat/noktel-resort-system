@@ -135,13 +135,16 @@ export function AdminDashboard() {
           import('firebase/firestore').then(async ({ doc, getDoc }) => {
              const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
              const adminDoc = await getDoc(doc(db, 'admins', currentUser.uid));
+             let newRole: 'admin' | 'customer';
              if (adminDoc.exists()) {
-               setUserRole('admin');
+               newRole = 'admin';
              } else if (userDoc.exists() && userDoc.data().role === 'customer') {
-               setUserRole('customer');
+               newRole = 'customer';
              } else {
-               setUserRole(currentUser.email === 'admin@noktel.com' || currentUser.email === 'test@example.com' ? 'admin' : 'customer');
+               newRole = currentUser.email === 'admin@noktel.com' || currentUser.email === 'test@example.com' ? 'admin' : 'customer';
              }
+             setUserRole(newRole);
+             document.cookie = `noktel_role=${newRole}; path=/;`;
              setLoadingAuth(false);
           });
         } catch(e) {
@@ -150,6 +153,7 @@ export function AdminDashboard() {
         }
       } else {
         setUserRole(null);
+        document.cookie = "noktel_role=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
         setLoadingAuth(false);
       }
     });
