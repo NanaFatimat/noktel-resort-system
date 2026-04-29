@@ -6,14 +6,16 @@ import { Menu, X, Phone, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'motion/react';
 import { useBooking } from '@/components/booking/BookingContext';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { openBookingModal } = useBooking();
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [userRole, setUserRole] = useState<string>('Guest');
   const [authLoading, setAuthLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -26,8 +28,23 @@ export function Navbar() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          if (userDoc.exists() && userDoc.data().role) {
+            setUserRole(userDoc.data().role.charAt(0).toUpperCase() + userDoc.data().role.slice(1));
+          } else if (currentUser.email === 'admin@noktel.com' || currentUser.email === 'test@example.com') { // fallback
+            setUserRole('Admin');
+          } else {
+            setUserRole('Guest');
+          }
+        } catch (error) {
+          console.error("Error fetching user role:", error);
+          setUserRole(currentUser.email === 'admin@noktel.com' ? 'Admin' : 'Guest');
+        }
+      }
       setAuthLoading(false);
     });
     return () => unsubscribe();
@@ -107,7 +124,7 @@ export function Navbar() {
                       >
                         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
                           <p className="text-sm font-medium text-slate-900 truncate">{user.email}</p>
-                          <p className="text-xs text-slate-500 capitalize mt-0.5">Guest Account</p>
+                          <p className="text-xs text-slate-500 capitalize mt-0.5">{userRole} Account</p>
                         </div>
                         <Link href="/admin" className="flex flex-col">
                           <span className="px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2">
