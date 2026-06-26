@@ -190,7 +190,9 @@ function BookingSuccessContent() {
           try {
             await updateDoc(bookingRef, updates);
             const updatedSnap = await getDoc(bookingRef);
-            finalData = updatedSnap.data();
+            if (updatedSnap.exists()) {
+              finalData = updatedSnap.data();
+            }
           } catch (error) {
             handleFirestoreError(error, OperationType.UPDATE, `bookings/${bookingId}`);
           }
