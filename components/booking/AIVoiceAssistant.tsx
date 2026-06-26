@@ -441,6 +441,9 @@ export function AIVoiceAssistant() {
       audioContextRef.current.close();
       audioContextRef.current = null;
     }
+    if (gainNodeRef.current) {
+      gainNodeRef.current = null;
+    }
     stopPlayback();
   };
 
