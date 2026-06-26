@@ -121,43 +121,54 @@ export function AIVoiceAssistant() {
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       const chunk = new Int16Array(bytes.buffer);
       
-      const audioBuffer = audioContextRef.current.createBuffer(1, chunk.length, 24000);
-      const channelData = audioBuffer.getChannelData(0);
-      for (let i = 0; i < chunk.length; i++) {
-        channelData[i] = chunk[i] / 32768.0;
+      audioQueueRef.current.push(chunk);
+      if (!isPlayingRef.current) {
+        processQueue();
       }
-
-      const source = audioContextRef.current.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContextRef.current.destination);
-      
-      const currentTime = audioContextRef.current.currentTime;
-      // Add a tiny buffer (0.05s) to the very first chunk to allow for jitter
-      if (nextPlayTimeRef.current < currentTime) {
-        nextPlayTimeRef.current = currentTime + 0.05; 
-      }
-      
-      source.start(nextPlayTimeRef.current);
-      nextPlayTimeRef.current += audioBuffer.duration;
-      
-      setStatus('speaking');
-
-      source.onended = () => {
-         // If playback has caught up to the nextPlayTimeRef, we are done speaking
-         if (audioContextRef.current && audioContextRef.current.currentTime >= nextPlayTimeRef.current - 0.05) {
-            if (isCallActiveRef.current) {
-               setStatus('listening');
-            }
-         }
-      };
-
     } catch (e) {
       console.error("Error playing audio chunk:", e);
     }
   };
 
+  const processQueue = async () => {
+    if (audioQueueRef.current.length === 0 || !audioContextRef.current) {
+      isPlayingRef.current = false;
+      if (isCallActiveRef.current && status === 'speaking') {
+        setStatus('listening');
+      }
+      return;
+    }
+
+    isPlayingRef.current = true;
+    setStatus('speaking');
+    const chunk = audioQueueRef.current.shift()!;
+    // Gemini Live output is 24000Hz
+    const audioBuffer = audioContextRef.current.createBuffer(1, chunk.length, 24000);
+    const channelData = audioBuffer.getChannelData(0);
+    
+    for (let i = 0; i < chunk.length; i++) {
+      channelData[i] = chunk[i] / 32768.0;
+    }
+
+    const source = audioContextRef.current.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContextRef.current.destination);
+    
+    const startTime = Math.max(audioContextRef.current.currentTime, nextPlayTimeRef.current);
+    source.start(startTime);
+    nextPlayTimeRef.current = startTime + audioBuffer.duration;
+    
+    source.onended = () => {
+      processQueue();
+    };
+  };
+
   const stopPlayback = () => {
+    audioQueueRef.current = [];
+    isPlayingRef.current = false;
     nextPlayTimeRef.current = 0;
+    // We don't easily stop the currently playing source without keeping track of all of them,
+    // but clearing the queue stops future chunks.
   };
 
   // Removed static initialization to ensure latest key is used in startCall
@@ -247,7 +258,7 @@ export function AIVoiceAssistant() {
       setStatus('listening');
 
       const session = await aiRef.current.live.connect({
-        model: "gemini-2.0-flash-exp",
+        model: "gemini-3.1-flash-live-preview",
         callbacks: {
           onopen: () => {
             console.log("Live API connection established.");
@@ -369,7 +380,7 @@ export function AIVoiceAssistant() {
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
           },
           systemInstruction: `You are the Receptionist for Noktel Resort Hotel in Ilorin, Nigeria. 
           You are polite, professional, and helpful. Your job is to help customers check room availability and book rooms over the phone.
