@@ -7,7 +7,8 @@ import { Calendar, Users, ChevronRight, ChevronLeft, CheckCircle2, X, CreditCard
 import { useRooms, Room } from '@/hooks/use-rooms';
 import { addDoc, collection } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
-import { signInAnonymously } from 'firebase/auth';
+import { BookingWizardAuth } from './BookingWizardAuth';
+import { onAuthStateChanged } from 'firebase/auth';
 
 enum OperationType {
   CREATE = 'create',
@@ -82,38 +83,45 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!auth.currentUser);
 
   useEffect(() => {
-    async function fetchUserData() {
-      if (auth.currentUser) {
-        try {
-          const { getDoc, doc } = await import('firebase/firestore');
-          // Check if admin
-          let docSnap = await getDoc(doc(db, 'admins', auth.currentUser.uid));
-          if (!docSnap.exists()) {
-            docSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
-          }
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            setGuestDetails(prev => ({
-              ...prev,
-              name: data.name || prev.name,
-              email: data.email || auth.currentUser?.email || prev.email,
-              phone: data.phone || prev.phone
-            }));
-          } else {
-            setGuestDetails(prev => ({
-              ...prev,
-              email: auth.currentUser?.email || prev.email,
-            }));
-          }
-        } catch (e) {
-          console.error("Failed to fetch user data for prefill:", e);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsAuthenticated(!!user);
+      if (user) {
+        fetchUserData();
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  async function fetchUserData() {
+    if (auth.currentUser) {
+      try {
+        const { getDoc, doc } = await import('firebase/firestore');
+        let docSnap = await getDoc(doc(db, 'admins', auth.currentUser.uid));
+        if (!docSnap.exists()) {
+          docSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
         }
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setGuestDetails(prev => ({
+            ...prev,
+            name: data.name || prev.name,
+            email: data.email || auth.currentUser?.email || prev.email,
+            phone: data.phone || prev.phone
+          }));
+        } else {
+          setGuestDetails(prev => ({
+            ...prev,
+            email: auth.currentUser?.email || prev.email,
+          }));
+        }
+      } catch (e) {
+        console.error("Failed to fetch user data for prefill:", e);
       }
     }
-    fetchUserData();
-  }, []);
+  }
 
   // Calculate total amount
   const calculateTotal = () => {
@@ -324,52 +332,58 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                <h3 className="text-lg font-semibold text-slate-900">Guest Details</h3>
-                
-                <div className="bg-slate-50 p-4 rounded-lg mb-6 flex justify-between items-center">
-                  <div>
-                    <p className="font-medium text-slate-900">{selectedRoom?.name}</p>
-                    <p className="text-sm text-slate-500">{checkIn} to {checkOut}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-slate-500">Total</p>
-                    <p className="font-bold text-amber-600 text-lg">₦{calculateTotal().toLocaleString()}</p>
-                  </div>
-                </div>
+                {!isAuthenticated ? (
+                  <BookingWizardAuth onAuthenticated={() => setIsAuthenticated(true)} />
+                ) : (
+                  <>
+                    <h3 className="text-lg font-semibold text-slate-900">Guest Details</h3>
+                    
+                    <div className="bg-slate-50 p-4 rounded-lg mb-6 flex justify-between items-center">
+                      <div>
+                        <p className="font-medium text-slate-900">{selectedRoom?.name}</p>
+                        <p className="text-sm text-slate-500">{checkIn} to {checkOut}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-slate-500">Total</p>
+                        <p className="font-bold text-amber-600 text-lg">₦{calculateTotal().toLocaleString()}</p>
+                      </div>
+                    </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-slate-700">Full Name</label>
-                    <input 
-                      type="text" 
-                      value={guestDetails.name}
-                      onChange={(e) => setGuestDetails({...guestDetails, name: e.target.value})}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
-                      placeholder="John Doe"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-slate-700">Email Address</label>
-                    <input 
-                      type="email" 
-                      value={guestDetails.email}
-                      onChange={(e) => setGuestDetails({...guestDetails, email: e.target.value})}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
-                      placeholder="john@example.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-slate-700">Phone Number</label>
-                    <input 
-                      type="tel" 
-                      value={guestDetails.phone}
-                      onChange={(e) => setGuestDetails({...guestDetails, phone: e.target.value})}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
-                      placeholder="+234 800 000 0000"
-                    />
-                  </div>
-                </div>
-                {error && <p className="text-red-500 text-sm">{error}</p>}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium text-slate-700">Full Name</label>
+                        <input 
+                          type="text" 
+                          value={guestDetails.name}
+                          onChange={(e) => setGuestDetails({...guestDetails, name: e.target.value})}
+                          className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
+                          placeholder="John Doe"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-slate-700">Email Address</label>
+                        <input 
+                          type="email" 
+                          value={guestDetails.email}
+                          onChange={(e) => setGuestDetails({...guestDetails, email: e.target.value})}
+                          className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
+                          placeholder="john@example.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-slate-700">Phone Number</label>
+                        <input 
+                          type="tel" 
+                          value={guestDetails.phone}
+                          onChange={(e) => setGuestDetails({...guestDetails, phone: e.target.value})}
+                          className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
+                          placeholder="+234 800 000 0000"
+                        />
+                      </div>
+                    </div>
+                    {error && <p className="text-red-500 text-sm">{error}</p>}
+                  </>
+                )}
               </motion.div>
             )}
 
@@ -469,7 +483,7 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
             {step === 3 && (
               <Button 
                 onClick={() => setStep(4)} 
-                disabled={!guestDetails.name || !guestDetails.email || !guestDetails.phone}
+                disabled={!isAuthenticated || !guestDetails.name || !guestDetails.email || !guestDetails.phone}
               >
                 Continue to Payment <ChevronRight className="w-4 h-4 ml-2" />
               </Button>

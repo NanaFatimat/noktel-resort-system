@@ -111,6 +111,9 @@ export function AIVoiceAssistant() {
   const isPlayingRef = useRef(false);
   const nextPlayTimeRef = useRef(0);
 
+  const [speakerActive, setSpeakerActive] = useState(false);
+  const gainNodeRef = useRef<GainNode | null>(null);
+
   // Function to process and play audio chunks
   const playAudioChunk = async (base64Data: string) => {
     if (!audioContextRef.current) return;
@@ -152,7 +155,15 @@ export function AIVoiceAssistant() {
 
     const source = audioContextRef.current.createBufferSource();
     source.buffer = audioBuffer;
-    source.connect(audioContextRef.current.destination);
+
+    if (!gainNodeRef.current) {
+      gainNodeRef.current = audioContextRef.current.createGain();
+      gainNodeRef.current.connect(audioContextRef.current.destination);
+    }
+    
+    // Adjust volume (1.0 = normal, 3.0 = louder)
+    gainNodeRef.current.gain.value = speakerActive ? 3.0 : 1.0;
+    source.connect(gainNodeRef.current);
     
     const startTime = Math.max(audioContextRef.current.currentTime, nextPlayTimeRef.current);
     source.start(startTime);
@@ -514,7 +525,10 @@ export function AIVoiceAssistant() {
                         <span className="text-xs text-white">keypad</span>
                       </div>
                       <div className="flex flex-col items-center gap-2">
-                        <button className="w-16 h-16 rounded-full bg-[#333333] flex items-center justify-center hover:bg-[#444444] transition-colors">
+                        <button 
+                          onClick={() => setSpeakerActive(!speakerActive)}
+                          className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${speakerActive ? 'bg-blue-500 hover:bg-blue-600' : 'bg-[#333333] hover:bg-[#444444]'}`}
+                        >
                           <Volume2 className="w-7 h-7 text-white" />
                         </button>
                         <span className="text-xs text-white">speaker</span>
