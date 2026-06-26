@@ -108,6 +108,7 @@ export function AIVoiceAssistant() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioWorkletNodeRef = useRef<AudioWorkletNode | null>(null);
   const audioQueueRef = useRef<Int16Array[]>([]);
+  const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const isPlayingRef = useRef(false);
   const nextPlayTimeRef = useRef(0);
 
@@ -125,9 +126,7 @@ export function AIVoiceAssistant() {
       const chunk = new Int16Array(bytes.buffer);
       
       audioQueueRef.current.push(chunk);
-      if (!isPlayingRef.current) {
-        processQueue();
-      }
+      processQueue();
     } catch (e) {
       console.error("Error playing audio chunk:", e);
     }
@@ -135,51 +134,65 @@ export function AIVoiceAssistant() {
 
   const processQueue = async () => {
     if (audioQueueRef.current.length === 0 || !audioContextRef.current) {
-      isPlayingRef.current = false;
-      if (isCallActiveRef.current && status === 'speaking') {
-        setStatus('listening');
-      }
       return;
     }
 
     isPlayingRef.current = true;
     setStatus('speaking');
-    const chunk = audioQueueRef.current.shift()!;
-    // Gemini Live output is 24000Hz
-    const audioBuffer = audioContextRef.current.createBuffer(1, chunk.length, 24000);
-    const channelData = audioBuffer.getChannelData(0);
     
-    for (let i = 0; i < chunk.length; i++) {
-      channelData[i] = chunk[i] / 32768.0;
-    }
+    // Process all chunks currently in the queue
+    while (audioQueueRef.current.length > 0) {
+      const chunk = audioQueueRef.current.shift()!;
+      // Gemini Live output is 24000Hz
+      const audioBuffer = audioContextRef.current.createBuffer(1, chunk.length, 24000);
+      const channelData = audioBuffer.getChannelData(0);
+      
+      for (let i = 0; i < chunk.length; i++) {
+        channelData[i] = chunk[i] / 32768.0;
+      }
 
-    const source = audioContextRef.current.createBufferSource();
-    source.buffer = audioBuffer;
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = audioBuffer;
 
-    if (!gainNodeRef.current) {
-      gainNodeRef.current = audioContextRef.current.createGain();
-      gainNodeRef.current.connect(audioContextRef.current.destination);
+      if (!gainNodeRef.current) {
+        gainNodeRef.current = audioContextRef.current.createGain();
+        gainNodeRef.current.connect(audioContextRef.current.destination);
+      }
+      
+      // Adjust volume (1.0 = normal, 3.0 = louder)
+      gainNodeRef.current.gain.value = speakerActive ? 3.0 : 1.0;
+      source.connect(gainNodeRef.current);
+      
+      // Add a small buffer (50ms) if we are recovering from an underrun to prevent immediate stutter
+      if (nextPlayTimeRef.current < audioContextRef.current.currentTime) {
+        nextPlayTimeRef.current = audioContextRef.current.currentTime + 0.05;
+      }
+      
+      source.start(nextPlayTimeRef.current);
+      nextPlayTimeRef.current += audioBuffer.duration;
+      
+      activeSourcesRef.current.push(source);
+      
+      source.onended = () => {
+        activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
+        if (activeSourcesRef.current.length === 0 && audioQueueRef.current.length === 0) {
+          isPlayingRef.current = false;
+          if (isCallActiveRef.current) {
+            setStatus('listening');
+          }
+        }
+      };
     }
-    
-    // Adjust volume (1.0 = normal, 3.0 = louder)
-    gainNodeRef.current.gain.value = speakerActive ? 3.0 : 1.0;
-    source.connect(gainNodeRef.current);
-    
-    const startTime = Math.max(audioContextRef.current.currentTime, nextPlayTimeRef.current);
-    source.start(startTime);
-    nextPlayTimeRef.current = startTime + audioBuffer.duration;
-    
-    source.onended = () => {
-      processQueue();
-    };
   };
 
   const stopPlayback = () => {
     audioQueueRef.current = [];
+    activeSourcesRef.current.forEach(source => {
+      try { source.stop(); } catch (e) {}
+    });
+    activeSourcesRef.current = [];
     isPlayingRef.current = false;
     nextPlayTimeRef.current = 0;
-    // We don't easily stop the currently playing source without keeping track of all of them,
-    // but clearing the queue stops future chunks.
   };
 
   // Removed static initialization to ensure latest key is used in startCall
