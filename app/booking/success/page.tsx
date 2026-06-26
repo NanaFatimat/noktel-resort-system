@@ -173,35 +173,54 @@ function BookingSuccessContent() {
         
         // If it's a Stripe booking, we assume success if they reached this page
         // (In a real app, we'd verify with a webhook, but this is the success redirect)
+        let finalData = data;
+        let needsUpdate = false;
+        const updates: any = {};
+
         if (data.paymentMethod === 'stripe' && data.paymentStatus !== 'paid') {
+          updates.paymentStatus = 'paid';
+          updates.status = 'confirmed';
+          needsUpdate = true;
+        } else if (data.paymentMethod === 'pay_at_hotel' && data.status !== 'confirmed') {
+          updates.status = 'confirmed';
+          needsUpdate = true;
+        }
+
+        if (needsUpdate) {
           try {
-            await updateDoc(bookingRef, {
-              paymentStatus: 'paid',
-              status: 'confirmed'
-            });
+            await updateDoc(bookingRef, updates);
+            const updatedSnap = await getDoc(bookingRef);
+            finalData = updatedSnap.data();
           } catch (error) {
             handleFirestoreError(error, OperationType.UPDATE, `bookings/${bookingId}`);
           }
-          // Refresh data after update
-          const updatedSnap = await getDoc(bookingRef);
-          setBookingData({ id: updatedSnap.id, ...updatedSnap.data() });
-        } else if (data.paymentMethod === 'pay_at_hotel') {
-          // For pay at hotel, we just confirm the reservation status if not already
-          if (data.status !== 'confirmed') {
-            try {
-              await updateDoc(bookingRef, {
-                status: 'confirmed'
-              });
-            } catch (error) {
-              handleFirestoreError(error, OperationType.UPDATE, `bookings/${bookingId}`);
+        }
+
+        setBookingData({ id: bookingSnap.id, ...finalData });
+
+        // Send confirmation email if not already sent
+        if (finalData && !finalData.emailSent && finalData.status === 'confirmed') {
+          try {
+            const emailRes = await fetch('/api/email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                customerName: finalData.customerName,
+                customerEmail: finalData.customerEmail,
+                roomName: finalData.roomName || 'Premium Room',
+                checkIn: finalData.checkIn,
+                checkOut: finalData.checkOut,
+                bookingId: bookingId,
+                totalAmount: finalData.totalAmount || 0,
+              }),
+            });
+            
+            if (emailRes.ok) {
+              await updateDoc(bookingRef, { emailSent: true });
             }
-            const updatedSnap = await getDoc(bookingRef);
-            setBookingData({ id: updatedSnap.id, ...updatedSnap.data() });
-          } else {
-            setBookingData({ id: bookingSnap.id, ...data });
+          } catch (e) {
+            console.error('Failed to send confirmation email', e);
           }
-        } else {
-          setBookingData({ id: bookingSnap.id, ...data });
         }
         
         setStatus('success');
