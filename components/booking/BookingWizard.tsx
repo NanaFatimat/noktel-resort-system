@@ -7,7 +7,7 @@ import { Calendar, Users, ChevronRight, ChevronLeft, CheckCircle2, X, CreditCard
 import { useRooms, Room } from '@/hooks/use-rooms';
 import { addDoc, collection } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
-import { signInAnonymously } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 
 enum OperationType {
   CREATE = 'create',
@@ -82,10 +82,17 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  
+  // Auth Form State
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'guest_details'>('guest_details');
+  const [authPassword, setAuthPassword] = useState('');
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const isAuthenticated = auth.currentUser && !auth.currentUser.isAnonymous;
 
   useEffect(() => {
     async function fetchUserData() {
-      if (auth.currentUser) {
+      if (auth.currentUser && !auth.currentUser.isAnonymous) {
+        setAuthMode('guest_details');
         try {
           const { getDoc, doc } = await import('firebase/firestore');
           // Check if admin
@@ -110,6 +117,8 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
         } catch (e) {
           console.error("Failed to fetch user data for prefill:", e);
         }
+      } else {
+        setAuthMode('register');
       }
     }
     fetchUserData();
@@ -122,6 +131,45 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
     const end = new Date(checkOut);
     const nights = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
     return nights > 0 ? nights * selectedRoom.price : selectedRoom.price;
+  };
+
+  const handleAuth = async () => {
+    setIsAuthLoading(true);
+    setError('');
+    try {
+      if (authMode === 'register') {
+        const userCred = await createUserWithEmailAndPassword(auth, guestDetails.email, authPassword);
+        const { setDoc, doc } = await import('firebase/firestore');
+        await setDoc(doc(db, 'users', userCred.user.uid), {
+          role: 'customer',
+          name: guestDetails.name,
+          phone: guestDetails.phone,
+          email: guestDetails.email,
+          createdAt: new Date().toISOString()
+        });
+        
+        try {
+          await sendEmailVerification(userCred.user);
+        } catch (verifyErr) {
+          console.error("Verification email failed to send:", verifyErr);
+        }
+      } else {
+        await signInWithEmailAndPassword(auth, guestDetails.email, authPassword);
+      }
+      setAuthMode('guest_details');
+      setStep(4);
+    } catch (err: any) {
+      console.error("Auth Error", err);
+      if (err.code === 'auth/email-already-in-use') {
+        setError('Email already in use. Please sign in instead.');
+      } else if (err.code === 'auth/invalid-credential') {
+        setError('Invalid email or password.');
+      } else {
+        setError(err.message || 'Authentication failed. Please try again.');
+      }
+    } finally {
+      setIsAuthLoading(false);
+    }
   };
 
   const handleBook = async () => {
@@ -324,7 +372,9 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                <h3 className="text-lg font-semibold text-slate-900">Guest Details</h3>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  {authMode === 'guest_details' ? 'Guest Details' : authMode === 'login' ? 'Sign In' : 'Create Account'}
+                </h3>
                 
                 <div className="bg-slate-50 p-4 rounded-lg mb-6 flex justify-between items-center">
                   <div>
@@ -338,16 +388,18 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
                 </div>
 
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-slate-700">Full Name</label>
-                    <input 
-                      type="text" 
-                      value={guestDetails.name}
-                      onChange={(e) => setGuestDetails({...guestDetails, name: e.target.value})}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
-                      placeholder="John Doe"
-                    />
-                  </div>
+                  {authMode !== 'login' && (
+                    <div>
+                      <label className="text-sm font-medium text-slate-700">Full Name</label>
+                      <input 
+                        type="text" 
+                        value={guestDetails.name}
+                        onChange={(e) => setGuestDetails({...guestDetails, name: e.target.value})}
+                        className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
+                        placeholder="John Doe"
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className="text-sm font-medium text-slate-700">Email Address</label>
                     <input 
@@ -356,19 +408,45 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
                       onChange={(e) => setGuestDetails({...guestDetails, email: e.target.value})}
                       className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
                       placeholder="john@example.com"
+                      disabled={authMode === 'guest_details' && isAuthenticated}
                     />
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-slate-700">Phone Number</label>
-                    <input 
-                      type="tel" 
-                      value={guestDetails.phone}
-                      onChange={(e) => setGuestDetails({...guestDetails, phone: e.target.value})}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
-                      placeholder="+234 800 000 0000"
-                    />
-                  </div>
+                  {authMode !== 'login' && (
+                    <div>
+                      <label className="text-sm font-medium text-slate-700">Phone Number</label>
+                      <input 
+                        type="tel" 
+                        value={guestDetails.phone}
+                        onChange={(e) => setGuestDetails({...guestDetails, phone: e.target.value})}
+                        className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
+                        placeholder="+234 800 000 0000"
+                      />
+                    </div>
+                  )}
+                  {authMode !== 'guest_details' && (
+                    <div>
+                      <label className="text-sm font-medium text-slate-700">Password</label>
+                      <input 
+                        type="password" 
+                        value={authPassword}
+                        onChange={(e) => setAuthPassword(e.target.value)}
+                        className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none mt-1"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                  )}
                 </div>
+                {authMode !== 'guest_details' && (
+                  <div className="text-center mt-4">
+                    <button 
+                      type="button" 
+                      onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+                      className="text-sm text-slate-500 hover:text-amber-600 transition-colors"
+                    >
+                      {authMode === 'login' ? "Need an account? Register here" : "Already have an account? Sign in"}
+                    </button>
+                  </div>
+                )}
                 {error && <p className="text-red-500 text-sm">{error}</p>}
               </motion.div>
             )}
@@ -468,10 +546,23 @@ export function BookingWizard({ onClose }: BookingWizardProps) {
 
             {step === 3 && (
               <Button 
-                onClick={() => setStep(4)} 
-                disabled={!guestDetails.name || !guestDetails.email || !guestDetails.phone}
+                onClick={() => {
+                  if (authMode === 'guest_details') {
+                    setStep(4);
+                  } else {
+                    handleAuth();
+                  }
+                }} 
+                disabled={
+                  authMode === 'guest_details' 
+                    ? (!guestDetails.name || !guestDetails.email || !guestDetails.phone)
+                    : authMode === 'login' 
+                      ? (!guestDetails.email || !authPassword || isAuthLoading)
+                      : (!guestDetails.name || !guestDetails.email || !guestDetails.phone || !authPassword || isAuthLoading)
+                }
               >
-                Continue to Payment <ChevronRight className="w-4 h-4 ml-2" />
+                {isAuthLoading ? 'Authenticating...' : authMode === 'guest_details' ? 'Continue to Payment' : authMode === 'login' ? 'Sign In & Continue' : 'Create Account & Continue'}
+                {!isAuthLoading && <ChevronRight className="w-4 h-4 ml-2" />}
               </Button>
             )}
 
