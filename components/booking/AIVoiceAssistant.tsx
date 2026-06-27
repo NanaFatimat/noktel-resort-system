@@ -114,6 +114,7 @@ export function AIVoiceAssistant() {
 
   const [speakerActive, setSpeakerActive] = useState(false);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Function to process and play audio chunks
   const playAudioChunk = async (base64Data: string) => {
@@ -223,16 +224,28 @@ export function AIVoiceAssistant() {
       // Setup Audio Worklet for Recording
       const workletCode = `
         class RecorderProcessor extends AudioWorkletProcessor {
+          constructor() {
+            super();
+            this.bufferSize = 2048;
+            this.buffer = new Float32Array(this.bufferSize);
+            this.bufferIndex = 0;
+          }
           process(inputs, outputs, parameters) {
             const input = inputs[0];
             if (input.length > 0) {
               const channelData = input[0];
-              // Convert Float32 to Int16 PCM
-              const pcmData = new Int16Array(channelData.length);
               for (let i = 0; i < channelData.length; i++) {
-                pcmData[i] = Math.max(-1, Math.min(1, channelData[i])) * 0x7FFF;
+                this.buffer[this.bufferIndex] = channelData[i];
+                this.bufferIndex++;
+                if (this.bufferIndex >= this.bufferSize) {
+                  const pcmData = new Int16Array(this.bufferSize);
+                  for (let j = 0; j < this.bufferSize; j++) {
+                    pcmData[j] = Math.max(-1, Math.min(1, this.buffer[j])) * 0x7FFF;
+                  }
+                  this.port.postMessage(pcmData);
+                  this.bufferIndex = 0;
+                }
               }
-              this.port.postMessage(pcmData);
             }
             return true;
           }
@@ -246,6 +259,7 @@ export function AIVoiceAssistant() {
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
       } catch (err) {
         if (err instanceof Error && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
           setError("Microphone access denied. Please enable microphone permissions in your browser settings and try again.");
@@ -257,6 +271,12 @@ export function AIVoiceAssistant() {
       const source = audioContextRef.current.createMediaStreamSource(stream);
       audioWorkletNodeRef.current = new AudioWorkletNode(audioContextRef.current, 'recorder-processor');
       
+      // Ensure the worklet is not suspended by connecting it to a zero-gain destination
+      const zeroGain = audioContextRef.current.createGain();
+      zeroGain.gain.value = 0;
+      audioWorkletNodeRef.current.connect(zeroGain);
+      zeroGain.connect(audioContextRef.current.destination);
+
       audioWorkletNodeRef.current.port.onmessage = (event) => {
         if (sessionRef.current && isCallActiveRef.current) {
           const pcmData = event.data;
@@ -403,11 +423,6 @@ export function AIVoiceAssistant() {
         },
         config: {
           responseModalities: [Modality.AUDIO],
-          generationConfig: {
-            thinkingConfig: {
-              thinkingLevel: "minimal" as any,
-            }
-          },
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
           },
@@ -416,8 +431,8 @@ export function AIVoiceAssistant() {
           Always ask for check-in and check-out dates, and the number of guests.
           If they want to book, use the checkAvailability tool first to find rooms and quote the price.
           If they agree to the price, ask for their full name, email, and phone number, then use the bookRoom tool.
-          Keep your responses conversational, concise, and suitable for a voice call. Do not use markdown formatting.
-          This is a real-time voice conversation, so be natural and responsive.`,
+          Keep your responses extremely brief, direct, and conversational to ensure fast response times on this voice call. Do not use markdown formatting.
+          This is a real-time voice conversation, so be natural and highly responsive.`,
           tools: [{ functionDeclarations: [checkAvailabilityDeclaration, bookRoomDeclaration] }],
         },
       });
@@ -441,6 +456,10 @@ export function AIVoiceAssistant() {
     if (sessionRef.current) {
       sessionRef.current.close();
       sessionRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
     if (audioContextRef.current) {
       audioContextRef.current.close();
