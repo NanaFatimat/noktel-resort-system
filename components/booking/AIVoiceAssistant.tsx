@@ -403,6 +403,11 @@ export function AIVoiceAssistant() {
         },
         config: {
           responseModalities: [Modality.AUDIO],
+          generationConfig: {
+            thinkingConfig: {
+              thinkingLevel: "minimal" as any,
+            }
+          },
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
           },
