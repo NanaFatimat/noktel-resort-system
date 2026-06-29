@@ -112,9 +112,31 @@ export function AIVoiceAssistant() {
   const isPlayingRef = useRef(false);
   const nextPlayTimeRef = useRef(0);
 
-  const [speakerActive, setSpeakerActive] = useState(false);
+  const [speakerActive, setSpeakerActive] = useState(true);
+  const speakerActiveRef = useRef(true);
+  const [isMuted, setIsMuted] = useState(false);
+  const isMutedRef = useRef(false);
   const gainNodeRef = useRef<GainNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  const toggleMute = () => {
+    if (streamRef.current) {
+      const newMuted = !isMutedRef.current;
+      streamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = !newMuted;
+      });
+      setIsMuted(newMuted);
+      isMutedRef.current = newMuted;
+      
+      // If muting, also stop the AI from talking (interrupt)
+      if (newMuted) {
+        stopPlayback();
+        if (sessionRef.current) {
+          (sessionRef.current as any).sendClientContent({ turnComplete: true });
+        }
+      }
+    }
+  };
 
   // Function to process and play audio chunks
   const playAudioChunk = async (base64Data: string) => {
@@ -124,7 +146,7 @@ export function AIVoiceAssistant() {
       const binary = atob(base64Data);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const chunk = new Int16Array(bytes.buffer);
+      const chunk = new Int16Array(bytes.buffer, 0, Math.floor(bytes.length / 2));
       
       audioQueueRef.current.push(chunk);
       processQueue();
@@ -160,8 +182,8 @@ export function AIVoiceAssistant() {
         gainNodeRef.current.connect(audioContextRef.current.destination);
       }
       
-      // Adjust volume (1.0 = normal, 3.0 = louder)
-      gainNodeRef.current.gain.value = speakerActive ? 3.0 : 1.0;
+      // Adjust volume (1.0 = normal, 0.1 = earpiece)
+      gainNodeRef.current.gain.value = speakerActiveRef.current ? 1.0 : 0.1;
       source.connect(gainNodeRef.current);
       
       // Add a small buffer (50ms) if we are recovering from an underrun to prevent immediate stutter
@@ -329,7 +351,9 @@ export function AIVoiceAssistant() {
 
             // Handle User Transcription
             if (message.serverContent?.turnComplete) {
-              // Turn is done
+              if (activeSourcesRef.current.length === 0 && audioQueueRef.current.length === 0) {
+                setStatus('listening');
+              }
             }
 
             // Handle Interruption
@@ -438,6 +462,7 @@ export function AIVoiceAssistant() {
       });
 
       sessionRef.current = session;
+      (session as any).sendClientContent({ turns: [{ role: 'user', parts: [{ text: 'Hello! I am calling to check room availability. Please greet me warmly.' }] }], turnComplete: true });
 
     } catch (err) {
       console.error("Failed to start call:", err);
@@ -517,7 +542,7 @@ export function AIVoiceAssistant() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="bg-[#1C1C1E] sm:rounded-[40px] shadow-2xl w-full h-full sm:h-[800px] sm:max-w-[375px] overflow-hidden flex flex-col relative text-white"
+              className="bg-[#1C1C1E] sm:rounded-[40px] shadow-2xl w-full h-[100dvh] sm:h-[800px] sm:max-w-[375px] overflow-hidden flex flex-col relative text-white"
             >
               {/* Top Section */}
               <div className="pt-16 pb-8 flex flex-col items-center px-6 text-center">
@@ -547,14 +572,17 @@ export function AIVoiceAssistant() {
               </div>
 
               {/* Bottom Section - Controls */}
-              <div className="pb-12 px-8">
+              <div className="pb-20 sm:pb-12 px-8">
                 {isCallActive ? (
                   <>
                     {/* 3x2 Grid */}
-                    <div className="grid grid-cols-3 gap-y-6 gap-x-4 mb-12">
+                    <div className="grid grid-cols-3 gap-y-4 sm:gap-y-6 gap-x-4 mb-6 sm:mb-12">
                       <div className="flex flex-col items-center gap-2">
-                        <button className="w-16 h-16 rounded-full bg-[#333333] flex items-center justify-center hover:bg-[#444444] transition-colors">
-                          <MicOff className="w-7 h-7 text-white" />
+                        <button 
+                          onClick={toggleMute}
+                          className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${isMuted ? 'bg-white text-black hover:bg-gray-200' : 'bg-[#333333] hover:bg-[#444444] text-white'}`}
+                        >
+                          {isMuted ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
                         </button>
                         <span className="text-xs text-white">mute</span>
                       </div>
@@ -566,10 +594,17 @@ export function AIVoiceAssistant() {
                       </div>
                       <div className="flex flex-col items-center gap-2">
                         <button 
-                          onClick={() => setSpeakerActive(!speakerActive)}
-                          className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${speakerActive ? 'bg-blue-500 hover:bg-blue-600' : 'bg-[#333333] hover:bg-[#444444]'}`}
+                          onClick={() => {
+                            const newActive = !speakerActive;
+                            setSpeakerActive(newActive);
+                            speakerActiveRef.current = newActive;
+                            if (gainNodeRef.current) {
+                              gainNodeRef.current.gain.value = newActive ? 1.0 : 0.1;
+                            }
+                          }}
+                          className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${speakerActive ? 'bg-white hover:bg-gray-200' : 'bg-[#333333] hover:bg-[#444444]'}`}
                         >
-                          <Volume2 className="w-7 h-7 text-white" />
+                          <Volume2 className={`w-7 h-7 ${speakerActive ? 'text-black' : 'text-white'}`} />
                         </button>
                         <span className="text-xs text-white">speaker</span>
                       </div>
@@ -604,7 +639,7 @@ export function AIVoiceAssistant() {
                     </div>
                   </>
                 ) : (
-                  <div className="flex justify-between px-4 mb-8">
+                  <div className="flex justify-between px-4 mb-6 sm:mb-8">
                     <div className="flex flex-col items-center gap-2">
                       <button 
                         onClick={() => setIsOpen(false)}
