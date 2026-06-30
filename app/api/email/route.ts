@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { BookingEmailTemplate } from '@/components/booking/BookingEmailTemplate';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resend: Resend | null = null;
 
 export async function POST(req: Request) {
   try {
@@ -22,6 +22,10 @@ export async function POST(req: Request) {
         message: 'Email sending mocked (API key missing)',
         success: true
       });
+    }
+
+    if (!resend) {
+      resend = new Resend(process.env.RESEND_API_KEY);
     }
 
     const data = await resend.emails.send({
