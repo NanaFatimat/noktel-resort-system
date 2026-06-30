@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, Phone, PhoneOff, Loader2, Volume2, Grid, Plus, Video, User } from 'lucide-react';
+import { Mic, MicOff, Phone, PhoneOff, Volume2, ChevronLeft, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GoogleGenAI, Type, FunctionDeclaration, Modality, LiveServerMessage } from '@google/genai';
 import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
@@ -356,6 +356,13 @@ export function AIVoiceAssistant() {
               }
             }
 
+            if (message.serverContent?.inputTranscription?.text) {
+              const text = message.serverContent.inputTranscription.text.toLowerCase();
+              if (text.includes('hang up')) {
+                endCall();
+              }
+            }
+
             // Handle Interruption
             if (message.serverContent?.interrupted) {
               stopPlayback();
@@ -536,130 +543,110 @@ export function AIVoiceAssistant() {
       {/* Call Interface Modal */}
       <AnimatePresence>
         {isOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl sm:p-4">
+          <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950 sm:p-4 text-white font-sans overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-orange-600/30 via-zinc-950 to-zinc-950 pointer-events-none" />
+            
             <motion.div 
-              initial={{ opacity: 0, y: '100%' }}
+              initial={{ opacity: 0, y: '10%' }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: '100%' }}
+              exit={{ opacity: 0, y: '10%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="bg-[#1C1C1E] sm:rounded-[40px] shadow-2xl w-full h-[100dvh] sm:h-[800px] sm:max-w-[375px] overflow-hidden flex flex-col relative text-white"
+              className="w-full h-[100dvh] sm:h-[800px] sm:max-w-[400px] sm:mx-auto sm:rounded-[40px] flex flex-col relative z-10"
             >
-              {/* Top Section */}
-              <div className="pt-16 pb-8 flex flex-col items-center px-6 text-center">
-                <h2 className="text-3xl font-normal tracking-wide mb-2">Voice Receptionist</h2>
-                <p className="text-[#8E8E93] text-sm">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 pt-14 pb-4">
+                <button onClick={() => setIsOpen(false)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
+                  <ChevronLeft className="w-5 h-5 text-white" />
+                </button>
+                <div className="bg-white/10 px-4 py-1.5 rounded-full flex items-center gap-2">
+                   <span className="text-sm font-medium">Noktel AI</span>
+                   <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full">Beta</span>
+                </div>
+                <button className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
+                  <RefreshCw className="w-4 h-4 text-white" />
+                </button>
+              </div>
+
+              {/* Glowing Orb */}
+              <div className="flex-1 flex flex-col items-center justify-center relative">
+                <div className="relative w-64 h-64 flex items-center justify-center mb-12">
+                  <motion.div
+                    animate={
+                      isCallActive 
+                        ? (status === 'speaking' 
+                            ? { scale: [1, 1.3, 1], rotate: [0, 90, 180], opacity: [0.6, 1, 0.6] } 
+                            : { scale: [1, 1.05, 1], rotate: [0, 45, 90], opacity: [0.4, 0.7, 0.4] })
+                        : { scale: 1, opacity: 0.2 }
+                    }
+                    transition={{ duration: status === 'speaking' ? 2 : 4, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute inset-0 rounded-full blur-3xl bg-gradient-to-tr from-orange-600 to-amber-500"
+                  />
+                  <motion.div
+                    animate={
+                      isCallActive
+                         ? { scale: [0.9, 1.1, 0.9], rotate: [360, 180, 0] }
+                         : { scale: 1 }
+                    }
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-6 rounded-full blur-2xl bg-gradient-to-bl from-orange-400 to-yellow-300 opacity-70"
+                  />
+                  <div className="absolute inset-10 rounded-full bg-orange-200/20 backdrop-blur-sm border border-orange-200/30 shadow-[0_0_60px_rgba(251,146,60,0.6)] mix-blend-overlay" />
+                </div>
+
+                {/* Status Text */}
+                <div className="px-8 text-center min-h-[100px]">
                   {error ? (
-                    <span className="text-red-400">{error}</span>
+                    <p className="text-red-400 font-medium">{error}</p>
+                  ) : !isCallActive ? (
+                    <p className="text-white/60 text-lg font-light leading-relaxed tracking-wide">
+                      Tap to connect
+                    </p>
                   ) : (
-                    !isCallActive ? 'Noktel Resort' : (status === 'listening' ? 'listening...' : status === 'speaking' ? 'speaking...' : 'connecting...')
+                    <p className="text-white/80 text-lg font-light leading-relaxed tracking-wide">
+                      {status === 'listening' ? "I'm Listening..." : status === 'speaking' ? "Speaking..." : "Connecting..."}
+                    </p>
                   )}
-                </p>
+                </div>
               </div>
 
-              {/* Middle Section - Avatar */}
-              <div className="flex-1 flex items-center justify-center">
-                 <div className="relative w-32 h-32">
-                    {/* Glowing effect when active */}
-                    {isCallActive && (
-                      <div className={`absolute inset-0 rounded-full blur-2xl transition-colors duration-500 ${
-                        status === 'speaking' ? 'bg-blue-500/40' : status === 'listening' ? 'bg-[#34C759]/40' : 'bg-white/10'
-                      }`} />
-                    )}
-                    <div className="w-full h-full rounded-full bg-gradient-to-b from-[#4A4A4C] to-[#2C2C2E] flex items-center justify-center relative z-10 overflow-hidden">
-                       <User className="w-16 h-16 text-white/50" />
-                    </div>
-                 </div>
-              </div>
+              {/* Bottom Controls */}
+              <div className="pb-16 px-8 flex justify-between items-center max-w-[320px] mx-auto w-full">
+                <button 
+                  onClick={() => {
+                    const newActive = !speakerActive;
+                    setSpeakerActive(newActive);
+                    speakerActiveRef.current = newActive;
+                    if (gainNodeRef.current) {
+                      gainNodeRef.current.gain.value = newActive ? 1.0 : 0.1;
+                    }
+                  }}
+                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 backdrop-blur-md border ${speakerActive ? 'bg-white/20 border-white/30 hover:bg-white/30 shadow-[0_0_15px_rgba(255,255,255,0.1)]' : 'bg-white/5 border-white/10 hover:bg-white/10 text-white/50'}`}
+                >
+                  <Volume2 className={`w-6 h-6 ${speakerActive ? 'text-white' : 'text-white/50'}`} />
+                </button>
 
-              {/* Bottom Section - Controls */}
-              <div className="pb-20 sm:pb-12 px-8">
-                {isCallActive ? (
-                  <>
-                    {/* 3x2 Grid */}
-                    <div className="grid grid-cols-3 gap-y-4 sm:gap-y-6 gap-x-4 mb-6 sm:mb-12">
-                      <div className="flex flex-col items-center gap-2">
-                        <button 
-                          onClick={toggleMute}
-                          className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${isMuted ? 'bg-white text-black hover:bg-gray-200' : 'bg-[#333333] hover:bg-[#444444] text-white'}`}
-                        >
-                          {isMuted ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
-                        </button>
-                        <span className="text-xs text-white">mute</span>
-                      </div>
-                      <div className="flex flex-col items-center gap-2">
-                        <button className="w-16 h-16 rounded-full bg-[#333333] flex items-center justify-center hover:bg-[#444444] transition-colors">
-                          <Grid className="w-7 h-7 text-white" />
-                        </button>
-                        <span className="text-xs text-white">keypad</span>
-                      </div>
-                      <div className="flex flex-col items-center gap-2">
-                        <button 
-                          onClick={() => {
-                            const newActive = !speakerActive;
-                            setSpeakerActive(newActive);
-                            speakerActiveRef.current = newActive;
-                            if (gainNodeRef.current) {
-                              gainNodeRef.current.gain.value = newActive ? 1.0 : 0.1;
-                            }
-                          }}
-                          className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${speakerActive ? 'bg-white hover:bg-gray-200' : 'bg-[#333333] hover:bg-[#444444]'}`}
-                        >
-                          <Volume2 className={`w-7 h-7 ${speakerActive ? 'text-black' : 'text-white'}`} />
-                        </button>
-                        <span className="text-xs text-white">speaker</span>
-                      </div>
-                      <div className="flex flex-col items-center gap-2">
-                        <button className="w-16 h-16 rounded-full bg-[#333333] flex items-center justify-center hover:bg-[#444444] transition-colors opacity-50 cursor-not-allowed">
-                          <Plus className="w-7 h-7 text-white" />
-                        </button>
-                        <span className="text-xs text-white">add call</span>
-                      </div>
-                      <div className="flex flex-col items-center gap-2">
-                        <button className="w-16 h-16 rounded-full bg-[#333333] flex items-center justify-center hover:bg-[#444444] transition-colors opacity-50 cursor-not-allowed">
-                          <Video className="w-7 h-7 text-white" />
-                        </button>
-                        <span className="text-xs text-white">FaceTime</span>
-                      </div>
-                      <div className="flex flex-col items-center gap-2">
-                        <button className="w-16 h-16 rounded-full bg-[#333333] flex items-center justify-center hover:bg-[#444444] transition-colors opacity-50 cursor-not-allowed">
-                          <User className="w-7 h-7 text-white" />
-                        </button>
-                        <span className="text-xs text-white">contacts</span>
-                      </div>
-                    </div>
+                <div className="relative">
+                  {isCallActive && (
+                    <motion.div 
+                      animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0.7, 0.4] }}
+                      transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                      className="absolute inset-0 rounded-full bg-orange-500 blur-xl"
+                    />
+                  )}
+                  <button 
+                    onClick={isCallActive ? endCall : startCall}
+                    className={`relative w-20 h-20 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(0,0,0,0.5)] transition-all duration-300 backdrop-blur-lg border ${isCallActive ? 'bg-gradient-to-tr from-red-500 to-rose-400 border-red-400/50 hover:scale-105' : 'bg-gradient-to-tr from-orange-500 to-amber-400 border-orange-400/50 hover:scale-105'}`}
+                  >
+                    {isCallActive ? <PhoneOff className="w-8 h-8 text-white drop-shadow-md" /> : <Phone className="w-8 h-8 text-white drop-shadow-md" />}
+                  </button>
+                </div>
 
-                    {/* End Call Button */}
-                    <div className="flex justify-center">
-                      <button 
-                        onClick={() => { endCall(); setIsOpen(false); }}
-                        className="w-16 h-16 rounded-full bg-[#FF3B30] flex items-center justify-center hover:bg-[#FF453A] transition-colors"
-                      >
-                        <PhoneOff className="w-8 h-8 text-white" />
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex justify-between px-4 mb-6 sm:mb-8">
-                    <div className="flex flex-col items-center gap-2">
-                      <button 
-                        onClick={() => setIsOpen(false)}
-                        className="w-16 h-16 rounded-full bg-[#FF3B30] flex items-center justify-center hover:bg-[#FF453A] transition-colors"
-                      >
-                        <PhoneOff className="w-8 h-8 text-white" />
-                      </button>
-                      <span className="text-xs text-white">Decline</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-2">
-                      <button 
-                        onClick={startCall}
-                        className="w-16 h-16 rounded-full bg-[#34C759] flex items-center justify-center hover:bg-[#32D74B] transition-colors"
-                      >
-                        <Phone className="w-8 h-8 text-white" />
-                      </button>
-                      <span className="text-xs text-white">Accept</span>
-                    </div>
-                  </div>
-                )}
+                <button 
+                  onClick={toggleMute}
+                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 backdrop-blur-md border ${isMuted ? 'bg-orange-500/20 border-orange-500/30 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.2)]' : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'}`}
+                >
+                  {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                </button>
               </div>
             </motion.div>
           </div>
